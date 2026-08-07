@@ -1,0 +1,255 @@
+:root {
+    --bg-dark: #090a10;
+    --card-bg: rgba(255, 255, 255, 0.03);
+    --card-border: rgba(255, 255, 255, 0.08);
+    --card-glow: rgba(99, 102, 241, 0.15);
+    
+    --text-main: #ffffff;
+    --text-muted: #94a3b8;
+    --accent-indigo: #6366f1;
+    --accent-purple: #a855f7;
+    --accent-pink: #ec4899;
+    
+    --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-code: 'Fira Code', monospace;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Ambient Glow Orbs */
+.ambient-glow {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.6;
+    animation: floatGlow 12s ease-in-out infinite alternate;
+}
+
+.glow-1 {
+    width: 450px;
+    height: 450px;
+    background: radial-gradient(circle, var(--accent-indigo) 0%, rgba(99, 102, 241, 0) 70%);
+    top: 15%;
+    left: 20%;
+}
+
+.glow-2 {
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, var(--accent-pink) 0%, rgba(236, 72, 153, 0) 70%);
+    bottom: 15%;
+    right: 20%;
+    animation-delay: -6s;
+}
+
+@keyframes floatGlow {
+    0% {
+        transform: translate(0, 0) scale(1);
+    }
+    50% {
+        transform: translate(30px, -40px) scale(1.1);
+    }
+    100% {
+        transform: translate(-30px, 30px) scale(0.95);
+    }
+}
+
+/* Background Canvas */
+#bg-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+}
+
+/* Main Layout */
+.main-container {
+    position: relative;
+    z-index: 2;
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 540px;
+}
+
+/* Glassmorphism Card */
+.glass-card {
+    position: relative;
+    background: var(--card-bg);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--card-border);
+    border-radius: 24px;
+    padding: 3rem 2.5rem;
+    text-align: center;
+    box-shadow: 
+        0 20px 50px rgba(0, 0, 0, 0.4),
+        inset 0 1px 1px rgba(255, 255, 255, 0.1);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+    overflow: hidden;
+}
+
+.glass-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 
+        0 30px 60px rgba(0, 0, 0, 0.5),
+        0 0 30px var(--card-glow),
+        inset 0 1px 1px rgba(255, 255, 255, 0.15);
+}
+
+.glow-border {
+    position: absolute;
+    inset: 0;
+    border-radius: 24px;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent 40%, rgba(99, 102, 241, 0.3));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+}
+
+/* Status Badge */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    margin-bottom: 2rem;
+    font-family: var(--font-code);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #22c55e;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #22c55e;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.5;
+        transform: scale(0.85);
+    }
+}
+
+/* Hero Content */
+.content-wrapper {
+    margin-bottom: 2.5rem;
+}
+
+.hero-title {
+    font-family: var(--font-heading);
+    font-size: 3.5rem;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -1.5px;
+    margin-bottom: 1rem;
+}
+
+.text-gradient {
+    background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 40%, var(--accent-indigo) 70%, var(--accent-pink) 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shine 8s ease infinite;
+}
+
+@keyframes shine {
+    to {
+        background-position: 200% center;
+    }
+}
+
+.hero-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    font-weight: 400;
+    line-height: 1.6;
+}
+
+/* Card Footer & GitHub Button */
+.card-footer {
+    display: flex;
+    justify-content: center;
+}
+
+.github-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-main);
+    text-decoration: none;
+    padding: 12px 24px;
+    border-radius: 14px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.25s ease;
+}
+
+.github-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+}
+
+.github-icon {
+    transition: transform 0.3s ease;
+}
+
+.github-btn:hover .github-icon {
+    transform: rotate(12deg) scale(1.1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+    .glass-card {
+        padding: 2.5rem 1.5rem;
+    }
+
+    .hero-title {
+        font-size: 2.75rem;
+    }
+
+    .hero-subtitle {
+        font-size: 1rem;
+    }
+}
