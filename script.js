@@ -1,5 +1,5 @@
 // mysol AI Persona Debate Arena Engine
-// Direct Gemini REST API Integration with Smart Active Model Auto-Selection
+// Direct Gemini REST API Integration (API Key Stored in Browser LocalStorage)
 
 function getSavedApiKey() {
     return localStorage.getItem("gemini_api_key") || "";
@@ -513,7 +513,6 @@ async function fetchGeminiResponse(persona) {
 
     let lastErr = null;
 
-    // Try starting from current working model index
     for (let attempts = 0; attempts < GEMINI_MODELS.length; attempts++) {
         const idx = (currentModelIndex + attempts) % GEMINI_MODELS.length;
         const modelName = GEMINI_MODELS[idx];
@@ -558,14 +557,13 @@ ${contextPrompt.length > 0 ? contextPrompt : "(토론의 첫 발언)"}
             const data = await res.json();
 
             if (res.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                currentModelIndex = idx; // Save working model
+                currentModelIndex = idx;
                 return data.candidates[0].content.parts[0].text.trim();
             }
 
             if (data.error) {
                 lastErr = new Error(data.error.message);
                 if (data.error.message.includes("quota") || data.error.message.includes("429")) {
-                    // Try next model if quota limit is model-specific
                     continue;
                 }
             }
