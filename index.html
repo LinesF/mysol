@@ -25,9 +25,14 @@
                 <span class="brand-badge">LIVE ARENA</span>
                 <span class="brand-name">mysol.ai</span>
             </div>
-            <div class="header-status">
-                <span class="live-dot"></span>
-                <span id="api-status-text">Gemini 2.0 Connected</span>
+            <div class="header-status-wrapper">
+                <div class="header-status">
+                    <span id="live-dot" class="live-dot"></span>
+                    <span id="api-status-text">Gemini Status Check...</span>
+                </div>
+                <button id="btn-open-api-modal" class="btn-api-key" title="API Key 설정">
+                    🔑 Key 설정
+                </button>
             </div>
         </header>
 
@@ -157,6 +162,30 @@
                 </div>
             </aside>
         </main>
+    </div>
+
+    <!-- API Key Settings Modal -->
+    <div id="api-modal" class="modal-backdrop" style="display:none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>🔑 Gemini API Key 설정</h2>
+                <button id="btn-close-api-modal" class="btn-icon">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-desc">
+                    Google AI Studio에서 발급받은 <strong>Gemini API Key</strong>를 입력해주세요.<br>
+                    키는 브라우저 내부에만 안전하게 저장됩니다.
+                </p>
+                <div class="input-group">
+                    <input type="password" id="input-api-key" placeholder="AIzaSy..." class="modal-input">
+                    <button id="btn-toggle-key-visibility" class="btn-input-icon" title="보기/숨기기">👁️</button>
+                </div>
+                <div id="api-key-error-msg" class="error-msg" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-save-api-key" class="btn-primary">저장 및 연동</button>
+            </div>
+        </div>
     </div>
 
     <script src="script.js"></script>

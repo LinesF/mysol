@@ -1,8 +1,15 @@
 // mysol AI Persona Debate Arena Engine
-// Powered by Gemini 2.0 Flash API
+// Powered by Gemini API (with User API Key Storage & Leaked Detection)
 
-const GEMINI_API_KEY = "AIzaSyCIEsPhvgwgxAnQfOidDfOYWjoxNEtL_bQ";
-const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+const DEFAULT_API_KEY = "AIzaSyCIEsPhvgwgxAnQfOidDfOYWjoxNEtL_bQ";
+
+function getActiveApiKey() {
+    return localStorage.getItem("gemini_api_key") || DEFAULT_API_KEY;
+}
+
+function getApiUrl(key) {
+    return `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
+}
 
 // 25+ Rich Topics Bank
 const TOPICS = [
@@ -20,13 +27,10 @@ const TOPICS = [
     "사회의 발전을 이끄는 것은 이성인가, 감정인가?",
     "불로장생 기술이 인류 전체에게 행복일까?",
     "자율주행차 트롤리 딜레마의 최종 판단 주체",
-    "사생활 무제한 공개 vs 범죄율 0% 사회",
-    "기억을 선택적으로 삭제하는 치료 기술",
-    "인공 장기로 인간의 수명이 200세가 되는 세상",
-    "감정을 느끼는 로봇과의 결혼이 가능한가?"
+    "사생활 무제한 공개 vs 범죄율 0% 사회"
 ];
 
-// 4 Personas Configurations with Unique Diverse Traits
+// 4 Personas Configurations
 const PERSONAS = [
     {
         id: "nova",
@@ -87,30 +91,22 @@ const FALLBACK_QUOTES = {
     nova: [
         "혁신의 진통일 뿐입니다. 결국 기술이 인간의 삶을 비약적으로 끌어올릴 것입니다!",
         "초기의 부작용은 더 나은 알고리즘과 첨단 기술로 충분히 해결할 수 있습니다.",
-        "인류는 도구를 통해 발전해 왔습니다. AI 역시 우리 능력을 한 단계 높여줄 도구입니다.",
-        "위험을 두려워해 시도조차 하지 않는다면 인류의 발전은 거기서 멈추고 맙니다.",
-        "새로운 기술이 열어줄 효율성과 가능성에 주목해야 합니다."
+        "인류는 도구를 통해 발전해 왔습니다. AI 역시 우리 능력을 한 단계 높여줄 도구입니다."
     ],
     kael: [
         "화려한 이면 뒤에 숨겨진 자본과 권력의 통제 가능성을 경계해야 합니다.",
         "한 번 상실한 프라이버시와 인권은 기술이 아무리 발전해도 되돌릴 수 없습니다.",
-        "기술의 이익은 일부가 독점하고, 그 부작용은 온전히 대중이 짊어지게 될 것입니다.",
-        "시스템의 치명적 오류나 악용 위험에 대한 대비책은 마련되어 있습니까?",
-        "편리함에 중독되어 인간의 자율적 판단 능력을 스스로 포기하고 있습니다."
+        "기술의 이익은 일부가 독점하고, 그 부작용은 온전히 대중이 짊어지게 될 것입니다."
     ],
     sage: [
         "기술적 성공보다 중요한 것은 '인간이란 무엇인가'에 대한 근본적 질문입니다.",
         "편리함이 늘어날수록 인간 스스로 고뇌하고 성숙해질 기회는 줄어들고 있습니다.",
-        "영혼과 자의식이 결여된 지능은 그저 정교한 계산기에 불과합니다.",
-        "결과보다 중요한 것은 그 과정을 겪으며 느끼는 인간의 감정과 경험입니다.",
-        "우리가 정말 두려워해야 할 것은 인공지능이 아니라, 기계처럼 변해가는 인간입니다."
+        "영혼과 자의식이 결여된 지능은 그저 정교한 계산기에 불과합니다."
     ],
     rex: [
         "이상적인 논쟁은 그만하고 당장 도입할 수 있는 비용과 법적 기준부터 이야기합시다.",
         "기술이 좋든 나쁘든, 경제적 실익이 없으면 시장에서 살아남지 못합니다.",
-        "현실적인 대안 없이 비판만 하거나 찬양만 하는 것은 아무 도움이 되지 않아요.",
-        "당장 책임 소재를 명확히 할 규제 가이드라인부터 제정하는 것이 시급합니다.",
-        "결국 소비자와 일반 대중이 수용할 수 있는 가격과 안전성이 핵심입니다."
+        "현실적인 대안 없이 비판만 하거나 찬양만 하는 것은 아무 도움이 되지 않아요."
     ]
 };
 
@@ -124,9 +120,8 @@ let isGenerating = false;
 let personaTurnIndex = 0;
 let conversationHistory = [];
 
-// Turn Delay Configuration (Default: 18~24 seconds per turn for comfortable reading)
 const TURN_DELAY_BASE = 18000; // 18 seconds
-const TURN_DELAY_RANDOM = 6000;  // Up to +6 seconds (total 18~24s)
+const TURN_DELAY_RANDOM = 6000;
 let turnCountdownSeconds = 0;
 let turnCountdownInterval = null;
 
@@ -144,15 +139,66 @@ const iconPlay = document.getElementById("icon-play");
 const toggleDebateText = document.getElementById("toggle-debate-text");
 const btnClearFeed = document.getElementById("btn-clear-feed");
 const apiStatusTextEl = document.getElementById("api-status-text");
+const liveDotEl = document.getElementById("live-dot");
+
+// Modal DOM Elements
+const btnOpenApiModal = document.getElementById("btn-open-api-modal");
+const btnCloseApiModal = document.getElementById("btn-close-api-modal");
+const apiModal = document.getElementById("api-modal");
+const inputApiKey = document.getElementById("input-api-key");
+const btnToggleKeyVisibility = document.getElementById("btn-toggle-key-visibility");
+const btnSaveApiKey = document.getElementById("btn-save-api-key");
+const apiKeyErrorMsg = document.getElementById("api-key-error-msg");
 
 // Initial Setup
 document.addEventListener("DOMContentLoaded", () => {
     initCanvasParticles();
+    initModalEvents();
     startNewTopic();
     startTimer();
     startDebateLoop();
+});
 
-    // Event Listeners
+// Modal Events
+function initModalEvents() {
+    btnOpenApiModal.addEventListener("click", () => {
+        inputApiKey.value = localStorage.getItem("gemini_api_key") || "";
+        apiKeyErrorMsg.style.display = "none";
+        apiModal.style.display = "flex";
+    });
+
+    btnCloseApiModal.addEventListener("click", () => {
+        apiModal.style.display = "none";
+    });
+
+    btnToggleKeyVisibility.addEventListener("click", () => {
+        if (inputApiKey.type === "password") {
+            inputApiKey.type = "text";
+        } else {
+            inputApiKey.type = "password";
+        }
+    });
+
+    btnSaveApiKey.addEventListener("click", () => {
+        const val = inputApiKey.value.trim();
+        if (!val) {
+            apiKeyErrorMsg.textContent = "API Key를 입력해주세요.";
+            apiKeyErrorMsg.style.display = "block";
+            return;
+        }
+
+        localStorage.setItem("gemini_api_key", val);
+        apiModal.style.display = "none";
+        addSystemNotice("새로운 Gemini API Key가 저장되었습니다. 연동을 재시도합니다.");
+        
+        if (liveDotEl) liveDotEl.classList.remove("error");
+        if (apiStatusTextEl) apiStatusTextEl.textContent = "Gemini Key Updated (Connecting...)";
+        
+        if (!isGenerating && debateActive) {
+            triggerNextTurn();
+        }
+    });
+
     btnNextTopic.addEventListener("click", () => {
         startNewTopic();
     });
@@ -180,7 +226,7 @@ document.addEventListener("DOMContentLoaded", () => {
         conversationHistory = [];
         addSystemNotice("대화 기록이 초기화되었습니다.");
     });
-});
+}
 
 // Topic & Timer Logic
 function startNewTopic() {
@@ -246,13 +292,26 @@ async function triggerNextTurn() {
     scrollToBottom();
 
     let responseText = "";
+    let isApiSuccess = false;
 
     try {
         responseText = await fetchGeminiResponse(persona);
-        if (apiStatusTextEl) apiStatusTextEl.textContent = "Gemini 2.0 Connected";
+        isApiSuccess = true;
+        if (liveDotEl) liveDotEl.classList.remove("error");
+        if (apiStatusTextEl) apiStatusTextEl.textContent = "Gemini 2.0 Connected (Live AI)";
     } catch (err) {
-        console.warn("Gemini API call warning/error:", err);
-        if (apiStatusTextEl) apiStatusTextEl.textContent = "Gemini API Standby (Smart Loop)";
+        console.warn("Gemini API Error Detail:", err);
+
+        if (err.message && err.message.includes("leaked")) {
+            if (liveDotEl) liveDotEl.classList.add("error");
+            if (apiStatusTextEl) apiStatusTextEl.textContent = "⚠️ Key 유출로 차단됨 (Key 설정 필요)";
+            addSystemNotice("❌ 구글 API 키가 '유출(Leaked)' 상태로 차단되었습니다. 상단 [Key 설정]에서 새 키를 등록해주세요.");
+        } else if (err.message && err.message.includes("429")) {
+            if (apiStatusTextEl) apiStatusTextEl.textContent = "API 호출한도 초과 (비상 대기 중)";
+        } else {
+            if (apiStatusTextEl) apiStatusTextEl.textContent = "API 연결 대기 중 (Smart Fallback)";
+        }
+
         responseText = getFallbackResponse(persona);
     }
 
@@ -278,7 +337,7 @@ async function triggerNextTurn() {
     // Move to next persona turn
     personaTurnIndex = (personaTurnIndex + 1) % PERSONAS.length;
 
-    // Schedule next speaker with 18~24 seconds comfortable reading interval
+    // Schedule next speaker with 18~24 seconds interval
     if (debateActive) {
         const totalDelay = Math.floor(Math.random() * TURN_DELAY_RANDOM) + TURN_DELAY_BASE;
         startTurnCountdown(Math.floor(totalDelay / 1000), personaTurnIndex);
@@ -293,7 +352,7 @@ function startTurnCountdown(seconds, nextIndex) {
 
     const updateStatus = () => {
         if (!debateActive || isGenerating) return;
-        if (apiStatusTextEl) {
+        if (apiStatusTextEl && !apiStatusTextEl.textContent.includes("차단됨")) {
             apiStatusTextEl.textContent = `다음 발언 (${nextPersona.name}): ${turnCountdownSeconds}초 후`;
         }
     };
@@ -320,8 +379,11 @@ function startDebateLoop() {
     setTimeout(triggerNextTurn, 1500);
 }
 
-// Call Gemini API
+// Call Gemini API with precise error inspection
 async function fetchGeminiResponse(persona) {
+    const key = getActiveApiKey();
+    const url = getApiUrl(key);
+
     const recentHistory = conversationHistory.slice(-5);
     const contextPrompt = recentHistory.map(h => `${h.persona}: "${h.text}"`).join("\n");
 
@@ -351,17 +413,19 @@ ${contextPrompt.length > 0 ? contextPrompt : "(토론의 첫 발언)"}
         }
     };
 
-    const res = await fetch(API_URL, {
+    const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody)
     });
 
+    const data = await res.json();
+
     if (!res.ok) {
-        throw new Error(`API error status: ${res.status}`);
+        const errorMsg = data.error?.message || `HTTP error ${res.status}`;
+        throw new Error(errorMsg);
     }
 
-    const data = await res.json();
     const reply = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
     if (!reply) {
