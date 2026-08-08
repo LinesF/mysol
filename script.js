@@ -1,12 +1,20 @@
 // mysol AI Persona Debate Arena Engine
-// Direct Gemini REST API Integration with Rate Limit Handling & Error Recovery
+// Direct Gemini REST API Integration with Smart Model Fallback & Quiet Rate-Limit Handling
 
 function getSavedApiKey() {
     return localStorage.getItem("gemini_api_key") || "";
 }
 
-function getApiUrl(key) {
-    return `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
+// Fallback Model Candidate List
+const GEMINI_MODELS = [
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-2.0-flash-lite"
+];
+let currentModelIndex = 0;
+
+function getApiUrl(key, modelName) {
+    return `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
 }
 
 // 25+ Rich Topics Bank
@@ -95,6 +103,9 @@ let personaTurnIndex = 0;
 let conversationHistory = [];
 let isKeyVerified = false;
 
+let consecutiveRateLimitCount = 0;
+let isRateNoticeShownInFeed = false;
+
 const TURN_DELAY_BASE = 20000; // 20 seconds
 const TURN_DELAY_RANDOM = 5000;
 let turnCountdownSeconds = 0;
@@ -138,8 +149,8 @@ document.addEventListener("DOMContentLoaded", () => {
 async function checkAndVerifyInitialApiKey() {
     const key = getSavedApiKey();
     if (!key) {
-        setApiKeyErrorState("API Key 미등록 (상단 [Key 설정]을 눌러 등록해주세요)");
-        addErrorNotice("⚠️ API Key가 등록되지 않았습니다. 상단 [🔑 Key 설정] 버튼을 클릭해 유효한 Gemini API Key를 입력해주세요.");
+        setApiKeyErrorState("API Key 미등록 (Key 설정 필요)");
+        addErrorNotice("⚠️ API Key가 등록되지 않았습니다. 상단 [🔑 Key 설정] 버튼을 클릭해 유효한 Gemini API Key를 등록해주세요.");
         openApiModal();
         return;
     }
@@ -148,16 +159,20 @@ async function checkAndVerifyInitialApiKey() {
     try {
         await verifyApiKey(key);
         isKeyVerified = true;
+        consecutiveRateLimitCount = 0;
+        isRateNoticeShownInFeed = false;
         setApiKeySuccessState();
         addSystemNotice("✅ Gemini API 연결 성공! AI 토론을 시작합니다.");
         triggerNextTurn();
     } catch (err) {
-        const isRateLimit = isRateLimitError(err);
-        if (isRateLimit) {
-            isKeyVerified = true; // Key is valid, just rate limited
-            setApiKeyWaitingState("호출 한도 초과 (15초 후 자동 재시도)");
-            addSystemNotice("⏳ 구글 API 분당 호출 한도(Rate Limit)에 도달했습니다. 15초 후 자동으로 토론을 재개합니다.");
-            setTimeout(triggerNextTurn, 15000);
+        if (isRateLimitError(err)) {
+            isKeyVerified = true;
+            setApiKeyWaitingState("호출 한도 초과 (25초 후 자동 재시도)");
+            if (!isRateNoticeShownInFeed) {
+                addSystemNotice("⏳ 구글 API 분당 호출 제한에 도달하여 잠시 후 자동으로 진행합니다.");
+                isRateNoticeShownInFeed = true;
+            }
+            setTimeout(triggerNextTurn, 25000);
         } else {
             isKeyVerified = false;
             const msg = parseApiError(err);
@@ -197,6 +212,8 @@ function initModalEvents() {
             await verifyApiKey(val);
             localStorage.setItem("gemini_api_key", val);
             isKeyVerified = true;
+            consecutiveRateLimitCount = 0;
+            isRateNoticeShownInFeed = false;
             apiModal.style.display = "none";
             
             setApiKeySuccessState();
@@ -213,13 +230,14 @@ function initModalEvents() {
             btnSaveApiKey.textContent = "저장 및 연동";
             
             if (isRateLimitError(err)) {
-                // Key works, just temporary rate limit during test!
                 localStorage.setItem("gemini_api_key", val);
                 isKeyVerified = true;
+                consecutiveRateLimitCount = 0;
+                isRateNoticeShownInFeed = false;
                 apiModal.style.display = "none";
-                setApiKeyWaitingState("호출 한도 초과 (잠시 후 재시도)");
-                addSystemNotice("⏳ 구글 API 분당 호출 제한(15 RPM)으로 잠시 대기 후 자동으로 토론이 진행됩니다.");
-                setTimeout(triggerNextTurn, 15000);
+                setApiKeyWaitingState("호출 한도 초과 (25초 후 자동 재시도)");
+                addSystemNotice("⏳ 구글 API 분당 호출 제한에 도달했습니다. 25초 후 자동으로 진행됩니다.");
+                setTimeout(triggerNextTurn, 25000);
             } else {
                 isKeyVerified = false;
                 const msg = parseApiError(err);
@@ -275,24 +293,33 @@ function showModalError(msg) {
 
 // Verify API Key
 async function verifyApiKey(key) {
-    const url = getApiUrl(key);
-    const testBody = {
-        contents: [{ role: "user", parts: [{ text: "hi" }] }],
-        generationConfig: { maxOutputTokens: 5 }
-    };
+    let lastErr = null;
+    for (let i = 0; i < GEMINI_MODELS.length; i++) {
+        try {
+            const url = getApiUrl(key, GEMINI_MODELS[i]);
+            const testBody = {
+                contents: [{ role: "user", parts: [{ text: "hi" }] }],
+                generationConfig: { maxOutputTokens: 5 }
+            };
 
-    const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(testBody)
-    });
+            const res = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(testBody)
+            });
 
-    const data = await res.json();
+            const data = await res.json();
 
-    if (!res.ok) {
-        const errorMsg = data.error?.message || `HTTP ${res.status}`;
-        throw new Error(errorMsg);
+            if (res.ok) {
+                currentModelIndex = i;
+                return true;
+            }
+            lastErr = new Error(data.error?.message || `HTTP ${res.status}`);
+        } catch (e) {
+            lastErr = e;
+        }
     }
+    throw lastErr || new Error("API Key verification failed");
 }
 
 // Topic & Timer Logic
@@ -309,6 +336,7 @@ function startNewTopic() {
     // Reset Conversation Context
     conversationHistory = [];
     debateFeedEl.innerHTML = "";
+    isRateNoticeShownInFeed = false;
     addSystemNotice(`새로운 주제: "${currentTopic}" (10분 토론 개시)`);
 
     personaTurnIndex = 0;
@@ -342,7 +370,7 @@ function updateTimerUI() {
     timerProgressEl.style.width = `${percentage}%`;
 }
 
-// Debate Turn Trigger - Smart Handling for Rate Limits
+// Debate Turn Trigger with Clean Rate Limit Queue
 async function triggerNextTurn() {
     if (!debateActive || isGenerating) return;
 
@@ -369,6 +397,8 @@ async function triggerNextTurn() {
 
     try {
         responseText = await fetchGeminiResponse(persona);
+        consecutiveRateLimitCount = 0;
+        isRateNoticeShownInFeed = false;
         setApiKeySuccessState();
     } catch (err) {
         console.warn("Gemini API call returned error:", err);
@@ -382,10 +412,27 @@ async function triggerNextTurn() {
         isGenerating = false;
 
         if (isRateLimitError(err)) {
-            // Rate Limit (HTTP 429) -> NOT a bad key! Automatically wait 15 seconds and retry!
-            setApiKeyWaitingState("호출 한도 초과 (15초 후 자동 재시도)");
-            addSystemNotice("⏳ 구글 API 분당 호출 한도(15 RPM)에 도달했습니다. 15초 후 자동으로 이어서 토론합니다.");
-            setTimeout(triggerNextTurn, 15000);
+            consecutiveRateLimitCount++;
+
+            // If Rate Limit happens 4 consecutive times, pause debate gracefully
+            if (consecutiveRateLimitCount >= 4) {
+                debateActive = false;
+                iconPause.style.display = "none";
+                iconPlay.style.display = "block";
+                toggleDebateText.textContent = "토론 재개";
+                setApiKeyWaitingState("호출 제한 한도 초과 (일시정지됨)");
+                addErrorNotice("⚠️ 구글 API 분당 호출 한도가 지속적으로 초과되어 토론이 일시정지되었습니다.\n잠시 후 상단 [토론 재개] 버튼을 누르시거나 새 API Key를 설정해주세요.");
+                return;
+            }
+
+            // Retry quietly after 25s without duplicating notices in chat feed!
+            setApiKeyWaitingState(`호출 한도 대기 중 (${25}초 후 재시도)`);
+            if (!isRateNoticeShownInFeed) {
+                addSystemNotice("⏳ 구글 API 분당 호출 한도(15 RPM)에 도달했습니다. 잠시 대기 후 자동으로 이어서 진행됩니다.");
+                isRateNoticeShownInFeed = true;
+            }
+            
+            setTimeout(triggerNextTurn, 25000);
             return;
         }
 
@@ -420,7 +467,7 @@ async function triggerNextTurn() {
     // Move to next persona turn
     personaTurnIndex = (personaTurnIndex + 1) % PERSONAS.length;
 
-    // Schedule next speaker with 20~25 seconds interval to stay well within 15 RPM
+    // Schedule next speaker with 20~25 seconds interval
     if (debateActive && isKeyVerified) {
         const totalDelay = Math.floor(Math.random() * TURN_DELAY_RANDOM) + TURN_DELAY_BASE;
         startTurnCountdown(Math.floor(totalDelay / 1000), personaTurnIndex);
@@ -435,7 +482,7 @@ function startTurnCountdown(seconds, nextIndex) {
 
     const updateStatus = () => {
         if (!debateActive || isGenerating || !isKeyVerified) return;
-        if (apiStatusTextEl && !apiStatusTextEl.textContent.includes("오류") && !apiStatusTextEl.textContent.includes("한도")) {
+        if (apiStatusTextEl && !apiStatusTextEl.textContent.includes("오류") && !apiStatusTextEl.textContent.includes("한도") && !apiStatusTextEl.textContent.includes("대기")) {
             apiStatusTextEl.textContent = `다음 발언 (${nextPersona.name}): ${turnCountdownSeconds}초 후`;
         }
     };
@@ -458,12 +505,13 @@ function stopTurnCountdown() {
     }
 }
 
-// Call Gemini API
+// Call Gemini API with automatic model fallback
 async function fetchGeminiResponse(persona) {
     const key = getSavedApiKey();
     if (!key) throw new Error("API Key가 설정되지 않았습니다.");
 
-    const url = getApiUrl(key);
+    const modelName = GEMINI_MODELS[currentModelIndex] || "gemini-2.0-flash";
+    const url = getApiUrl(key, modelName);
     const recentHistory = conversationHistory.slice(-5);
     const contextPrompt = recentHistory.map(h => `${h.persona}: "${h.text}"`).join("\n");
 
@@ -533,7 +581,7 @@ function parseApiError(err) {
 // Status Bar Utilities
 function setApiKeySuccessState() {
     if (liveDotEl) liveDotEl.className = "live-dot";
-    if (apiStatusTextEl) apiStatusTextEl.textContent = "Gemini 2.0 Connected (Live AI)";
+    if (apiStatusTextEl) apiStatusTextEl.textContent = "Gemini Connected (Live AI)";
 }
 
 function setApiKeyTestingState() {
