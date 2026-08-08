@@ -1,5 +1,5 @@
 // mysol AI Persona Debate Arena Engine
-// Direct Gemini REST API Integration with Strict API Key Validation
+// Direct Gemini REST API Integration with Rate Limit Handling & Error Recovery
 
 function getSavedApiKey() {
     return localStorage.getItem("gemini_api_key") || "";
@@ -95,8 +95,8 @@ let personaTurnIndex = 0;
 let conversationHistory = [];
 let isKeyVerified = false;
 
-const TURN_DELAY_BASE = 18000; // 18 seconds
-const TURN_DELAY_RANDOM = 6000;
+const TURN_DELAY_BASE = 20000; // 20 seconds
+const TURN_DELAY_RANDOM = 5000;
 let turnCountdownSeconds = 0;
 let turnCountdownInterval = null;
 
@@ -139,12 +139,11 @@ async function checkAndVerifyInitialApiKey() {
     const key = getSavedApiKey();
     if (!key) {
         setApiKeyErrorState("API Key 미등록 (상단 [Key 설정]을 눌러 등록해주세요)");
-        addErrorNotice("⚠️ API Key가 등록되지 않았습니다. AI가 발언하려면 유효한 Gemini API Key를 등록해야 합니다.");
+        addErrorNotice("⚠️ API Key가 등록되지 않았습니다. 상단 [🔑 Key 설정] 버튼을 클릭해 유효한 Gemini API Key를 입력해주세요.");
         openApiModal();
         return;
     }
 
-    // Verify key with test request
     setApiKeyTestingState();
     try {
         await verifyApiKey(key);
@@ -153,15 +152,23 @@ async function checkAndVerifyInitialApiKey() {
         addSystemNotice("✅ Gemini API 연결 성공! AI 토론을 시작합니다.");
         triggerNextTurn();
     } catch (err) {
-        isKeyVerified = false;
-        const msg = parseApiError(err);
-        setApiKeyErrorState(`API Key 오류: ${msg}`);
-        addErrorNotice(`❌ API Key 오류로 AI 토론이 중단되었습니다: ${msg}\n상단 [🔑 Key 설정]에서 새 키를 입력해주세요.`);
-        openApiModal();
+        const isRateLimit = isRateLimitError(err);
+        if (isRateLimit) {
+            isKeyVerified = true; // Key is valid, just rate limited
+            setApiKeyWaitingState("호출 한도 초과 (15초 후 자동 재시도)");
+            addSystemNotice("⏳ 구글 API 분당 호출 한도(Rate Limit)에 도달했습니다. 15초 후 자동으로 토론을 재개합니다.");
+            setTimeout(triggerNextTurn, 15000);
+        } else {
+            isKeyVerified = false;
+            const msg = parseApiError(err);
+            setApiKeyErrorState(`API Key 오류: ${msg}`);
+            addErrorNotice(`❌ API Key 오류: ${msg}\n상단 [🔑 Key 설정]에서 올바른 Key를 입력해주세요.`);
+            openApiModal();
+        }
     }
 }
 
-// Modal Events & Key Validation
+// Modal Events
 function initModalEvents() {
     btnOpenApiModal.addEventListener("click", () => {
         openApiModal();
@@ -204,10 +211,21 @@ function initModalEvents() {
         } catch (err) {
             btnSaveApiKey.disabled = false;
             btnSaveApiKey.textContent = "저장 및 연동";
-            isKeyVerified = false;
-            const msg = parseApiError(err);
-            showModalError(`키 검증 실패: ${msg}`);
-            setApiKeyErrorState(`API Key 오류`);
+            
+            if (isRateLimitError(err)) {
+                // Key works, just temporary rate limit during test!
+                localStorage.setItem("gemini_api_key", val);
+                isKeyVerified = true;
+                apiModal.style.display = "none";
+                setApiKeyWaitingState("호출 한도 초과 (잠시 후 재시도)");
+                addSystemNotice("⏳ 구글 API 분당 호출 제한(15 RPM)으로 잠시 대기 후 자동으로 토론이 진행됩니다.");
+                setTimeout(triggerNextTurn, 15000);
+            } else {
+                isKeyVerified = false;
+                const msg = parseApiError(err);
+                showModalError(`키 검증 실패: ${msg}`);
+                setApiKeyErrorState(`API Key 오류`);
+            }
         }
     });
 
@@ -255,11 +273,11 @@ function showModalError(msg) {
     }
 }
 
-// Verify API Key via quick API test call
+// Verify API Key
 async function verifyApiKey(key) {
     const url = getApiUrl(key);
     const testBody = {
-        contents: [{ role: "user", parts: [{ text: "ping" }] }],
+        contents: [{ role: "user", parts: [{ text: "hi" }] }],
         generationConfig: { maxOutputTokens: 5 }
     };
 
@@ -324,11 +342,10 @@ function updateTimerUI() {
     timerProgressEl.style.width = `${percentage}%`;
 }
 
-// Debate Turn Trigger - STOPS COMPLETELY IF NO VALID KEY
+// Debate Turn Trigger - Smart Handling for Rate Limits
 async function triggerNextTurn() {
     if (!debateActive || isGenerating) return;
 
-    // Check if key is verified
     if (!isKeyVerified) {
         clearActiveSpeakers();
         stopTurnCountdown();
@@ -354,7 +371,7 @@ async function triggerNextTurn() {
         responseText = await fetchGeminiResponse(persona);
         setApiKeySuccessState();
     } catch (err) {
-        console.error("Gemini API call failed:", err);
+        console.warn("Gemini API call returned error:", err);
         
         // Remove typing bubble
         if (typingBubble.parentNode) {
@@ -363,13 +380,22 @@ async function triggerNextTurn() {
 
         clearActiveSpeakers();
         isGenerating = false;
-        isKeyVerified = false;
 
+        if (isRateLimitError(err)) {
+            // Rate Limit (HTTP 429) -> NOT a bad key! Automatically wait 15 seconds and retry!
+            setApiKeyWaitingState("호출 한도 초과 (15초 후 자동 재시도)");
+            addSystemNotice("⏳ 구글 API 분당 호출 한도(15 RPM)에 도달했습니다. 15초 후 자동으로 이어서 토론합니다.");
+            setTimeout(triggerNextTurn, 15000);
+            return;
+        }
+
+        // Permanent Key Error (Leaked, Invalid, Permission Denied)
+        isKeyVerified = false;
         const errorMsg = parseApiError(err);
         setApiKeyErrorState(`API Key 오류: ${errorMsg}`);
-        addErrorNotice(`❌ API Key 오류 발생으로 AI 발언이 중지되었습니다: ${errorMsg}\n상단 [🔑 Key 설정]에서 올바른 API Key를 등록해주세요.`);
+        addErrorNotice(`❌ API Key 오류 발생: ${errorMsg}\n상단 [🔑 Key 설정]에서 올바른 API Key를 등록해주세요.`);
         openApiModal();
-        return; // HALT TURN - DO NOT USE FALLBACK
+        return;
     }
 
     // Remove typing bubble & append real message bubble
@@ -394,7 +420,7 @@ async function triggerNextTurn() {
     // Move to next persona turn
     personaTurnIndex = (personaTurnIndex + 1) % PERSONAS.length;
 
-    // Schedule next speaker with 18~24 seconds interval
+    // Schedule next speaker with 20~25 seconds interval to stay well within 15 RPM
     if (debateActive && isKeyVerified) {
         const totalDelay = Math.floor(Math.random() * TURN_DELAY_RANDOM) + TURN_DELAY_BASE;
         startTurnCountdown(Math.floor(totalDelay / 1000), personaTurnIndex);
@@ -409,7 +435,7 @@ function startTurnCountdown(seconds, nextIndex) {
 
     const updateStatus = () => {
         if (!debateActive || isGenerating || !isKeyVerified) return;
-        if (apiStatusTextEl) {
+        if (apiStatusTextEl && !apiStatusTextEl.textContent.includes("오류") && !apiStatusTextEl.textContent.includes("한도")) {
             apiStatusTextEl.textContent = `다음 발언 (${nextPersona.name}): ${turnCountdownSeconds}초 후`;
         }
     };
@@ -489,12 +515,18 @@ ${contextPrompt.length > 0 ? contextPrompt : "(토론의 첫 발언)"}
     return reply;
 }
 
+// Helper: Check if error is Rate Limit (429)
+function isRateLimitError(err) {
+    const msg = err.message || "";
+    return msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("Rate limit");
+}
+
 // Error Message Parser
 function parseApiError(err) {
     const msg = err.message || "";
     if (msg.includes("leaked")) return "유출되어 차단된 키 (Leaked Key)";
     if (msg.includes("API key not valid") || msg.includes("INVALID_ARGUMENT")) return "유효하지 않은 API Key";
-    if (msg.includes("429") || msg.includes("quota")) return "API 호출 한도 초과 (Rate Limit Exceeded)";
+    if (isRateLimitError(err)) return "분당 호출 한도 초과 (Rate Limit)";
     return msg || "API 연결 실패";
 }
 
@@ -507,6 +539,11 @@ function setApiKeySuccessState() {
 function setApiKeyTestingState() {
     if (liveDotEl) liveDotEl.className = "live-dot";
     if (apiStatusTextEl) apiStatusTextEl.textContent = "Gemini Key 검증 중...";
+}
+
+function setApiKeyWaitingState(msg) {
+    if (liveDotEl) liveDotEl.className = "live-dot";
+    if (apiStatusTextEl) apiStatusTextEl.textContent = `⏳ ${msg}`;
 }
 
 function setApiKeyErrorState(msg) {
