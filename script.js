@@ -1,15 +1,16 @@
 // mysol AI Persona Debate Arena Engine
-// Direct Gemini REST API Integration with Smart Model Fallback & Quiet Rate-Limit Handling
+// Direct Gemini REST API Integration with Smart Active Model Auto-Selection
 
 function getSavedApiKey() {
     return localStorage.getItem("gemini_api_key") || "";
 }
 
-// Fallback Model Candidate List
+// Active Models Prioritized for Google Generative AI API (gemini-2.5-flash & gemini-flash-latest)
 const GEMINI_MODELS = [
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-2.0-flash-lite"
+    "gemini-2.5-flash",
+    "gemini-flash-latest",
+    "gemini-3.6-flash",
+    "gemini-2.0-flash"
 ];
 let currentModelIndex = 0;
 
@@ -162,7 +163,7 @@ async function checkAndVerifyInitialApiKey() {
         consecutiveRateLimitCount = 0;
         isRateNoticeShownInFeed = false;
         setApiKeySuccessState();
-        addSystemNotice("✅ Gemini API 연결 성공! AI 토론을 시작합니다.");
+        addSystemNotice(`✅ Gemini API (${GEMINI_MODELS[currentModelIndex]}) 연결 성공! AI 토론을 시작합니다.`);
         triggerNextTurn();
     } catch (err) {
         if (isRateLimitError(err)) {
@@ -217,7 +218,7 @@ function initModalEvents() {
             apiModal.style.display = "none";
             
             setApiKeySuccessState();
-            addSystemNotice("🎉 API Key 검증 성공! AI 토론이 시작되었습니다.");
+            addSystemNotice(`🎉 Gemini API Key (${GEMINI_MODELS[currentModelIndex]}) 검증 성공! AI 토론이 시작되었습니다.`);
             
             btnSaveApiKey.disabled = false;
             btnSaveApiKey.textContent = "저장 및 연동";
@@ -291,7 +292,7 @@ function showModalError(msg) {
     }
 }
 
-// Verify API Key
+// Verify API Key across available models
 async function verifyApiKey(key) {
     let lastErr = null;
     for (let i = 0; i < GEMINI_MODELS.length; i++) {
@@ -310,11 +311,13 @@ async function verifyApiKey(key) {
 
             const data = await res.json();
 
-            if (res.ok) {
+            if (res.ok && data.candidates) {
                 currentModelIndex = i;
                 return true;
             }
-            lastErr = new Error(data.error?.message || `HTTP ${res.status}`);
+            if (data.error) {
+                lastErr = new Error(data.error.message);
+            }
         } catch (e) {
             lastErr = e;
         }
@@ -370,7 +373,7 @@ function updateTimerUI() {
     timerProgressEl.style.width = `${percentage}%`;
 }
 
-// Debate Turn Trigger with Clean Rate Limit Queue
+// Debate Turn Trigger
 async function triggerNextTurn() {
     if (!debateActive || isGenerating) return;
 
@@ -414,7 +417,6 @@ async function triggerNextTurn() {
         if (isRateLimitError(err)) {
             consecutiveRateLimitCount++;
 
-            // If Rate Limit happens 4 consecutive times, pause debate gracefully
             if (consecutiveRateLimitCount >= 4) {
                 debateActive = false;
                 iconPause.style.display = "none";
@@ -425,7 +427,6 @@ async function triggerNextTurn() {
                 return;
             }
 
-            // Retry quietly after 25s without duplicating notices in chat feed!
             setApiKeyWaitingState(`호출 한도 대기 중 (${25}초 후 재시도)`);
             if (!isRateNoticeShownInFeed) {
                 addSystemNotice("⏳ 구글 API 분당 호출 한도(15 RPM)에 도달했습니다. 잠시 대기 후 자동으로 이어서 진행됩니다.");
@@ -505,17 +506,23 @@ function stopTurnCountdown() {
     }
 }
 
-// Call Gemini API with automatic model fallback
+// Call Gemini API with model fallback loop
 async function fetchGeminiResponse(persona) {
     const key = getSavedApiKey();
     if (!key) throw new Error("API Key가 설정되지 않았습니다.");
 
-    const modelName = GEMINI_MODELS[currentModelIndex] || "gemini-2.0-flash";
-    const url = getApiUrl(key, modelName);
-    const recentHistory = conversationHistory.slice(-5);
-    const contextPrompt = recentHistory.map(h => `${h.persona}: "${h.text}"`).join("\n");
+    let lastErr = null;
 
-    const userPrompt = `[현재 토론 주제]: "${currentTopic}"
+    // Try starting from current working model index
+    for (let attempts = 0; attempts < GEMINI_MODELS.length; attempts++) {
+        const idx = (currentModelIndex + attempts) % GEMINI_MODELS.length;
+        const modelName = GEMINI_MODELS[idx];
+        const url = getApiUrl(key, modelName);
+
+        const recentHistory = conversationHistory.slice(-5);
+        const contextPrompt = recentHistory.map(h => `${h.persona}: "${h.text}"`).join("\n");
+
+        const userPrompt = `[현재 토론 주제]: "${currentTopic}"
 [직전 참가자들의 대화]:
 ${contextPrompt.length > 0 ? contextPrompt : "(토론의 첫 발언)"}
 
@@ -524,43 +531,50 @@ ${contextPrompt.length > 0 ? contextPrompt : "(토론의 첫 발언)"}
 직전 발언자의 말에 반응하며 당신만의 관점을 1~2문장(70자 이내)의 자연스러운 한국어로 말하세요.
 ⚠️ 지침: 기존 대화나 본인이 이전에 했을 법한 뻔한 표현을 절대 복사하듯 반복하지 말고, 다채롭고 신선한 표현으로 답변하세요.`;
 
-    const requestBody = {
-        contents: [
-            {
-                role: "user",
-                parts: [{ text: userPrompt }]
+        const requestBody = {
+            contents: [
+                {
+                    role: "user",
+                    parts: [{ text: userPrompt }]
+                }
+            ],
+            systemInstruction: {
+                parts: [{ text: persona.systemPrompt }]
+            },
+            generationConfig: {
+                temperature: 0.95,
+                topP: 0.9,
+                maxOutputTokens: 120
             }
-        ],
-        systemInstruction: {
-            parts: [{ text: persona.systemPrompt }]
-        },
-        generationConfig: {
-            temperature: 0.95,
-            topP: 0.9,
-            maxOutputTokens: 120
+        };
+
+        try {
+            const res = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(requestBody)
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                currentModelIndex = idx; // Save working model
+                return data.candidates[0].content.parts[0].text.trim();
+            }
+
+            if (data.error) {
+                lastErr = new Error(data.error.message);
+                if (data.error.message.includes("quota") || data.error.message.includes("429")) {
+                    // Try next model if quota limit is model-specific
+                    continue;
+                }
+            }
+        } catch (e) {
+            lastErr = e;
         }
-    };
-
-    const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody)
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-        const errorMsg = data.error?.message || `HTTP error ${res.status}`;
-        throw new Error(errorMsg);
     }
 
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-    if (!reply) {
-        throw new Error("Empty response returned from Gemini API");
-    }
-
-    return reply;
+    throw lastErr || new Error("Gemini API call failed for all models");
 }
 
 // Helper: Check if error is Rate Limit (429)
@@ -581,7 +595,7 @@ function parseApiError(err) {
 // Status Bar Utilities
 function setApiKeySuccessState() {
     if (liveDotEl) liveDotEl.className = "live-dot";
-    if (apiStatusTextEl) apiStatusTextEl.textContent = "Gemini Connected (Live AI)";
+    if (apiStatusTextEl) apiStatusTextEl.textContent = `Gemini (${GEMINI_MODELS[currentModelIndex]}) Connected`;
 }
 
 function setApiKeyTestingState() {
