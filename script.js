@@ -82,43 +82,35 @@ const PERSONAS = [
     }
 ];
 
-// Fallback pools with 10+ distinct quotes per persona to avoid repetition if API hits rate limit
+// Fallback quotes
 const FALLBACK_QUOTES = {
     nova: [
         "혁신의 진통일 뿐입니다. 결국 기술이 인간의 삶을 비약적으로 끌어올릴 것입니다!",
         "초기의 부작용은 더 나은 알고리즘과 첨단 기술로 충분히 해결할 수 있습니다.",
         "인류는 도구를 통해 발전해 왔습니다. AI 역시 우리 능력을 한 단계 높여줄 도구입니다.",
         "위험을 두려워해 시도조차 하지 않는다면 인류의 발전은 거기서 멈추고 맙니다.",
-        "새로운 기술이 열어줄 효율성과 가능성에 주목해야 합니다.",
-        "데이터와 과학적 접근이 결국 가장 객관적이고 안전한 답을 제시해 줄 것입니다.",
-        "미래는 기다리는 것이 아니라 혁신을 통해 직접 만들어나가는 것입니다."
+        "새로운 기술이 열어줄 효율성과 가능성에 주목해야 합니다."
     ],
     kael: [
         "화려한 이면 뒤에 숨겨진 자본과 권력의 통제 가능성을 경계해야 합니다.",
         "한 번 상실한 프라이버시와 인권은 기술이 아무리 발전해도 되돌릴 수 없습니다.",
         "기술의 이익은 일부가 독점하고, 그 부작용은 온전히 대중이 짊어지게 될 것입니다.",
         "시스템의 치명적 오류나 악용 위험에 대한 대비책은 마련되어 있습니까?",
-        "편리함에 중독되어 인간의 자율적 판단 능력을 스스로 포기하고 있습니다.",
-        "기술 만능주의는 가장 중요한 윤리적 검증을 가로막는 장애물입니다.",
-        "안전 장치 없는 과도한 속도의 혁신은 재앙을 초래할 뿐입니다."
+        "편리함에 중독되어 인간의 자율적 판단 능력을 스스로 포기하고 있습니다."
     ],
     sage: [
         "기술적 성공보다 중요한 것은 '인간이란 무엇인가'에 대한 근본적 질문입니다.",
         "편리함이 늘어날수록 인간 스스로 고뇌하고 성숙해질 기회는 줄어들고 있습니다.",
         "영혼과 자의식이 결여된 지능은 그저 정교한 계산기에 불과합니다.",
         "결과보다 중요한 것은 그 과정을 겪으며 느끼는 인간의 감정과 경험입니다.",
-        "우리가 정말 두려워해야 할 것은 인공지능이 아니라, 기계처럼 변해가는 인간입니다.",
-        "삶의 아름다움은 유한함과 불완전함 속에서 피어나는 법입니다.",
-        "존재의 가치는 효율성이 아닌 사랑과 공감에서 시작됩니다."
+        "우리가 정말 두려워해야 할 것은 인공지능이 아니라, 기계처럼 변해가는 인간입니다."
     ],
     rex: [
         "이상적인 논쟁은 그만하고 당장 도입할 수 있는 비용과 법적 기준부터 이야기합시다.",
         "기술이 좋든 나쁘든, 경제적 실익이 없으면 시장에서 살아남지 못합니다.",
         "현실적인 대안 없이 비판만 하거나 찬양만 하는 것은 아무 도움이 되지 않아요.",
         "당장 책임 소재를 명확히 할 규제 가이드라인부터 제정하는 것이 시급합니다.",
-        "결국 소비자와 일반 대중이 수용할 수 있는 가격과 안전성이 핵심입니다.",
-        "탁상공론보다는 실제 적용 현장에서 발생하는 문제부터 차근차근 풀어야 합니다.",
-        "명확한 수익 모델과 유지보수 대책이 없으면 사장될 아이디어일 뿐입니다."
+        "결국 소비자와 일반 대중이 수용할 수 있는 가격과 안전성이 핵심입니다."
     ]
 };
 
@@ -132,7 +124,12 @@ let isGenerating = false;
 let personaTurnIndex = 0;
 let conversationHistory = [];
 
-// Used fallback index tracking to avoid fallback repetition
+// Turn Delay Configuration (Default: 18~24 seconds per turn for comfortable reading)
+const TURN_DELAY_BASE = 18000; // 18 seconds
+const TURN_DELAY_RANDOM = 6000;  // Up to +6 seconds (total 18~24s)
+let turnCountdownSeconds = 0;
+let turnCountdownInterval = null;
+
 const usedFallbackIndices = { nova: 0, kael: 0, sage: 0, rex: 0 };
 
 // DOM Elements
@@ -174,6 +171,7 @@ document.addEventListener("DOMContentLoaded", () => {
             toggleDebateText.textContent = "토론 재개";
             addSystemNotice("토론이 일시정지되었습니다.");
             clearActiveSpeakers();
+            stopTurnCountdown();
         }
     });
 
@@ -235,6 +233,7 @@ function updateTimerUI() {
 async function triggerNextTurn() {
     if (!debateActive || isGenerating) return;
 
+    stopTurnCountdown();
     isGenerating = true;
     const persona = PERSONAS[personaTurnIndex];
 
@@ -279,10 +278,41 @@ async function triggerNextTurn() {
     // Move to next persona turn
     personaTurnIndex = (personaTurnIndex + 1) % PERSONAS.length;
 
-    // Schedule next speaker with 10~14 sec delay to respect API Rate Limits and allow natural reading
+    // Schedule next speaker with 18~24 seconds comfortable reading interval
     if (debateActive) {
-        const delay = Math.floor(Math.random() * 4000) + 10000;
-        setTimeout(triggerNextTurn, delay);
+        const totalDelay = Math.floor(Math.random() * TURN_DELAY_RANDOM) + TURN_DELAY_BASE;
+        startTurnCountdown(Math.floor(totalDelay / 1000), personaTurnIndex);
+        setTimeout(triggerNextTurn, totalDelay);
+    }
+}
+
+function startTurnCountdown(seconds, nextIndex) {
+    stopTurnCountdown();
+    turnCountdownSeconds = seconds;
+    const nextPersona = PERSONAS[nextIndex];
+
+    const updateStatus = () => {
+        if (!debateActive || isGenerating) return;
+        if (apiStatusTextEl) {
+            apiStatusTextEl.textContent = `다음 발언 (${nextPersona.name}): ${turnCountdownSeconds}초 후`;
+        }
+    };
+
+    updateStatus();
+    turnCountdownInterval = setInterval(() => {
+        turnCountdownSeconds--;
+        if (turnCountdownSeconds <= 0) {
+            stopTurnCountdown();
+        } else {
+            updateStatus();
+        }
+    }, 1000);
+}
+
+function stopTurnCountdown() {
+    if (turnCountdownInterval) {
+        clearInterval(turnCountdownInterval);
+        turnCountdownInterval = null;
     }
 }
 
@@ -290,7 +320,7 @@ function startDebateLoop() {
     setTimeout(triggerNextTurn, 1500);
 }
 
-// Call Gemini API with Anti-Repetition Prompt Logic
+// Call Gemini API
 async function fetchGeminiResponse(persona) {
     const recentHistory = conversationHistory.slice(-5);
     const contextPrompt = recentHistory.map(h => `${h.persona}: "${h.text}"`).join("\n");
@@ -301,7 +331,7 @@ ${contextPrompt.length > 0 ? contextPrompt : "(토론의 첫 발언)"}
 
 [요청 사항]:
 당신은 '${persona.name}' (${persona.role})입니다. 
-직전 발언에 반응하거나 본인의 색다른 관점을 1~2문장(70자 이내)의 자연스러운 한국어로 말하세요.
+직전 발언자의 말에 반응하며 당신만의 관점을 1~2문장(70자 이내)의 자연스러운 한국어로 말하세요.
 ⚠️ 지침: 기존 대화나 본인이 이전에 했을 법한 뻔한 표현을 절대 복사하듯 반복하지 말고, 다채롭고 신선한 표현으로 답변하세요.`;
 
     const requestBody = {
@@ -315,7 +345,7 @@ ${contextPrompt.length > 0 ? contextPrompt : "(토론의 첫 발언)"}
             parts: [{ text: persona.systemPrompt }]
         },
         generationConfig: {
-            temperature: 0.95, // Higher temperature for increased response diversity
+            temperature: 0.95,
             topP: 0.9,
             maxOutputTokens: 120
         }
