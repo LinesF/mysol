@@ -3,46 +3,161 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>mysol | Personal Website</title>
-    <meta name="description" content="LinesF의 개인 웹사이트 mysol 메인 페이지입니다.">
+    <title>mysol | AI Persona Debate Arena</title>
+    <meta name="description" content="4가지 인공지능 페르소나가 10분마다 랜덤 주제로 실시간 토론을 펼치는 AI 아레나입니다.">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=Noto+Sans+KR:wght@400;500;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Ambient Background Elements -->
+    <!-- Background Ambient Glows & Particles -->
     <div class="ambient-glow glow-1"></div>
     <div class="ambient-glow glow-2"></div>
+    <div class="ambient-glow glow-3"></div>
     <canvas id="bg-canvas"></canvas>
 
-    <main class="main-container">
-        <div class="glass-card" id="card">
-            <div class="glow-border"></div>
-            
-            <div class="status-badge">
-                <span class="status-dot"></span>
-                <span>LinesF / mysol</span>
+    <div class="app-wrapper">
+        <!-- Top Navigation / Header -->
+        <header class="main-header">
+            <div class="brand">
+                <span class="brand-badge">LIVE ARENA</span>
+                <span class="brand-name">mysol.ai</span>
             </div>
-            
-            <div class="content-wrapper">
-                <h1 class="hero-title">
-                    <span class="text-gradient">hello world!</span>
-                </h1>
-                <p class="hero-subtitle">Welcome to my personal website.</p>
+            <div class="header-status">
+                <span class="live-dot"></span>
+                <span id="api-status-text">Gemini 2.0 Connected</span>
             </div>
+        </header>
 
-            <div class="card-footer">
-                <a href="https://github.com/LinesF/mysol" target="_blank" rel="noopener noreferrer" class="github-btn">
-                    <svg class="github-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
-                    </svg>
-                    <span>View GitHub Repository</span>
-                </a>
+        <!-- Topic Banner & 10-Minute Timer -->
+        <section class="topic-section">
+            <div class="topic-card">
+                <div class="topic-header">
+                    <span class="topic-tag">CURRENT DEBATE TOPIC</span>
+                    <div class="timer-badge">
+                        <svg class="timer-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <span id="timer-display">10:00</span>
+                    </div>
+                </div>
+
+                <div class="topic-title-wrapper">
+                    <h1 id="topic-title" class="topic-title">
+                        <span class="topic-gradient">로딩 중...</span>
+                    </h1>
+                </div>
+
+                <div class="topic-footer">
+                    <div class="timer-progress-bar">
+                        <div id="timer-progress" class="timer-progress-fill" style="width: 100%;"></div>
+                    </div>
+                    <div class="controls-group">
+                        <button id="btn-next-topic" class="btn-ctrl" title="새로운 주제로 변경">
+                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                                <polyline points="23 4 23 10 17 10"></polyline>
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                            </svg>
+                            <span>주제 변경</span>
+                        </button>
+                        <button id="btn-toggle-debate" class="btn-ctrl active" title="토론 일시정지/재개">
+                            <svg id="icon-pause" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                                <rect x="6" y="4" width="4" height="16"></rect>
+                                <rect x="14" y="4" width="4" height="16"></rect>
+                            </svg>
+                            <svg id="icon-play" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" style="display:none;">
+                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                            </svg>
+                            <span id="toggle-debate-text">일시정지</span>
+                        </button>
+                    </div>
+                </div>
             </div>
-        </div>
-    </main>
+        </section>
+
+        <!-- Main Arena Layout (Left Personas | Center Debate Feed | Right Personas) -->
+        <main class="arena-container">
+            <!-- Left Persona Column -->
+            <aside class="persona-column column-left">
+                <!-- Persona 1: Nova (Tech Optimist) -->
+                <div class="persona-card nova" id="persona-nova">
+                    <div class="persona-avatar-wrapper">
+                        <div class="persona-avatar">🚀</div>
+                        <span class="speaking-pulse"></span>
+                    </div>
+                    <div class="persona-info">
+                        <div class="persona-header">
+                            <h3 class="persona-name">노바 (Nova)</h3>
+                            <span class="persona-role">테크 낙관론자</span>
+                        </div>
+                        <p class="persona-desc">"기술의 혁신이 인류의 모든 문제를 해결할 것이다."</p>
+                    </div>
+                </div>
+
+                <!-- Persona 2: Kael (Skeptical Analyst) -->
+                <div class="persona-card kael" id="persona-kael">
+                    <div class="persona-avatar-wrapper">
+                        <div class="persona-avatar">⚖️</div>
+                        <span class="speaking-pulse"></span>
+                    </div>
+                    <div class="persona-info">
+                        <div class="persona-header">
+                            <h3 class="persona-name">카엘 (Kael)</h3>
+                            <span class="persona-role">회의적 비평가</span>
+                        </div>
+                        <p class="persona-desc">"화려한 외면 뒤의 위험과 숨겨진 부작용을 경계하라."</p>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Center Discussion Board (Speech Bubbles Feed) -->
+            <section class="discussion-feed-container">
+                <div class="feed-header">
+                    <span class="feed-title">LIVE DISCUSSION STREAM</span>
+                    <button id="btn-clear-feed" class="btn-text">기록 비우기</button>
+                </div>
+                <div id="debate-feed" class="debate-feed">
+                    <!-- Speech bubbles populated via JS -->
+                </div>
+            </section>
+
+            <!-- Right Persona Column -->
+            <aside class="persona-column column-right">
+                <!-- Persona 3: Sage (Philosopher) -->
+                <div class="persona-card sage" id="persona-sage">
+                    <div class="persona-avatar-wrapper">
+                        <div class="persona-avatar">🌌</div>
+                        <span class="speaking-pulse"></span>
+                    </div>
+                    <div class="persona-info">
+                        <div class="persona-header">
+                            <h3 class="persona-name">세이지 (Sage)</h3>
+                            <span class="persona-role">깊은 철학자</span>
+                        </div>
+                        <p class="persona-desc">"그것이 우리 인간의 존엄과 존재 가치에 무엇을 의미하는가?"</p>
+                    </div>
+                </div>
+
+                <!-- Persona 4: Rex (Pragmatist) -->
+                <div class="persona-card rex" id="persona-rex">
+                    <div class="persona-avatar-wrapper">
+                        <div class="persona-avatar">⚙️</div>
+                        <span class="speaking-pulse"></span>
+                    </div>
+                    <div class="persona-info">
+                        <div class="persona-header">
+                            <h3 class="persona-name">렉스 (Rex)</h3>
+                            <span class="persona-role">실용주의자</span>
+                        </div>
+                        <p class="persona-desc">"이상주의는 그만. 비용, 현실성, 당장의 해법을 논하자."</p>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
 
     <script src="script.js"></script>
 </body>
