@@ -1,10 +1,8 @@
 // mysol AI Persona Debate Arena Engine
-// Powered by Gemini API (with User API Key Storage & Leaked Detection)
+// Direct Gemini REST API Integration with Strict API Key Validation
 
-const DEFAULT_API_KEY = "AIzaSyCIEsPhvgwgxAnQfOidDfOYWjoxNEtL_bQ";
-
-function getActiveApiKey() {
-    return localStorage.getItem("gemini_api_key") || DEFAULT_API_KEY;
+function getSavedApiKey() {
+    return localStorage.getItem("gemini_api_key") || "";
 }
 
 function getApiUrl(key) {
@@ -86,30 +84,6 @@ const PERSONAS = [
     }
 ];
 
-// Fallback quotes
-const FALLBACK_QUOTES = {
-    nova: [
-        "혁신의 진통일 뿐입니다. 결국 기술이 인간의 삶을 비약적으로 끌어올릴 것입니다!",
-        "초기의 부작용은 더 나은 알고리즘과 첨단 기술로 충분히 해결할 수 있습니다.",
-        "인류는 도구를 통해 발전해 왔습니다. AI 역시 우리 능력을 한 단계 높여줄 도구입니다."
-    ],
-    kael: [
-        "화려한 이면 뒤에 숨겨진 자본과 권력의 통제 가능성을 경계해야 합니다.",
-        "한 번 상실한 프라이버시와 인권은 기술이 아무리 발전해도 되돌릴 수 없습니다.",
-        "기술의 이익은 일부가 독점하고, 그 부작용은 온전히 대중이 짊어지게 될 것입니다."
-    ],
-    sage: [
-        "기술적 성공보다 중요한 것은 '인간이란 무엇인가'에 대한 근본적 질문입니다.",
-        "편리함이 늘어날수록 인간 스스로 고뇌하고 성숙해질 기회는 줄어들고 있습니다.",
-        "영혼과 자의식이 결여된 지능은 그저 정교한 계산기에 불과합니다."
-    ],
-    rex: [
-        "이상적인 논쟁은 그만하고 당장 도입할 수 있는 비용과 법적 기준부터 이야기합시다.",
-        "기술이 좋든 나쁘든, 경제적 실익이 없으면 시장에서 살아남지 못합니다.",
-        "현실적인 대안 없이 비판만 하거나 찬양만 하는 것은 아무 도움이 되지 않아요."
-    ]
-};
-
 // State Management
 let currentTopicIndex = 0;
 let currentTopic = "";
@@ -119,13 +93,12 @@ let debateActive = true;
 let isGenerating = false;
 let personaTurnIndex = 0;
 let conversationHistory = [];
+let isKeyVerified = false;
 
 const TURN_DELAY_BASE = 18000; // 18 seconds
 const TURN_DELAY_RANDOM = 6000;
 let turnCountdownSeconds = 0;
 let turnCountdownInterval = null;
-
-const usedFallbackIndices = { nova: 0, kael: 0, sage: 0, rex: 0 };
 
 // DOM Elements
 const topicTitleEl = document.getElementById("topic-title");
@@ -156,15 +129,42 @@ document.addEventListener("DOMContentLoaded", () => {
     initModalEvents();
     startNewTopic();
     startTimer();
-    startDebateLoop();
+    
+    // Check initial API Key state
+    checkAndVerifyInitialApiKey();
 });
 
-// Modal Events
+// Check API Key on Load
+async function checkAndVerifyInitialApiKey() {
+    const key = getSavedApiKey();
+    if (!key) {
+        setApiKeyErrorState("API Key 미등록 (상단 [Key 설정]을 눌러 등록해주세요)");
+        addErrorNotice("⚠️ API Key가 등록되지 않았습니다. AI가 발언하려면 유효한 Gemini API Key를 등록해야 합니다.");
+        openApiModal();
+        return;
+    }
+
+    // Verify key with test request
+    setApiKeyTestingState();
+    try {
+        await verifyApiKey(key);
+        isKeyVerified = true;
+        setApiKeySuccessState();
+        addSystemNotice("✅ Gemini API 연결 성공! AI 토론을 시작합니다.");
+        triggerNextTurn();
+    } catch (err) {
+        isKeyVerified = false;
+        const msg = parseApiError(err);
+        setApiKeyErrorState(`API Key 오류: ${msg}`);
+        addErrorNotice(`❌ API Key 오류로 AI 토론이 중단되었습니다: ${msg}\n상단 [🔑 Key 설정]에서 새 키를 입력해주세요.`);
+        openApiModal();
+    }
+}
+
+// Modal Events & Key Validation
 function initModalEvents() {
     btnOpenApiModal.addEventListener("click", () => {
-        inputApiKey.value = localStorage.getItem("gemini_api_key") || "";
-        apiKeyErrorMsg.style.display = "none";
-        apiModal.style.display = "flex";
+        openApiModal();
     });
 
     btnCloseApiModal.addEventListener("click", () => {
@@ -172,30 +172,42 @@ function initModalEvents() {
     });
 
     btnToggleKeyVisibility.addEventListener("click", () => {
-        if (inputApiKey.type === "password") {
-            inputApiKey.type = "text";
-        } else {
-            inputApiKey.type = "password";
-        }
+        inputApiKey.type = inputApiKey.type === "password" ? "text" : "password";
     });
 
-    btnSaveApiKey.addEventListener("click", () => {
+    btnSaveApiKey.addEventListener("click", async () => {
         const val = inputApiKey.value.trim();
         if (!val) {
-            apiKeyErrorMsg.textContent = "API Key를 입력해주세요.";
-            apiKeyErrorMsg.style.display = "block";
+            showModalError("API Key를 입력해주세요.");
             return;
         }
 
-        localStorage.setItem("gemini_api_key", val);
-        apiModal.style.display = "none";
-        addSystemNotice("새로운 Gemini API Key가 저장되었습니다. 연동을 재시도합니다.");
-        
-        if (liveDotEl) liveDotEl.classList.remove("error");
-        if (apiStatusTextEl) apiStatusTextEl.textContent = "Gemini Key Updated (Connecting...)";
-        
-        if (!isGenerating && debateActive) {
-            triggerNextTurn();
+        btnSaveApiKey.disabled = true;
+        btnSaveApiKey.textContent = "검증 중...";
+        showModalError("");
+
+        try {
+            await verifyApiKey(val);
+            localStorage.setItem("gemini_api_key", val);
+            isKeyVerified = true;
+            apiModal.style.display = "none";
+            
+            setApiKeySuccessState();
+            addSystemNotice("🎉 API Key 검증 성공! AI 토론이 시작되었습니다.");
+            
+            btnSaveApiKey.disabled = false;
+            btnSaveApiKey.textContent = "저장 및 연동";
+
+            if (!isGenerating && debateActive) {
+                triggerNextTurn();
+            }
+        } catch (err) {
+            btnSaveApiKey.disabled = false;
+            btnSaveApiKey.textContent = "저장 및 연동";
+            isKeyVerified = false;
+            const msg = parseApiError(err);
+            showModalError(`키 검증 실패: ${msg}`);
+            setApiKeyErrorState(`API Key 오류`);
         }
     });
 
@@ -210,7 +222,7 @@ function initModalEvents() {
             iconPlay.style.display = "none";
             toggleDebateText.textContent = "일시정지";
             addSystemNotice("토론이 재개되었습니다.");
-            triggerNextTurn();
+            if (isKeyVerified) triggerNextTurn();
         } else {
             iconPause.style.display = "none";
             iconPlay.style.display = "block";
@@ -226,6 +238,43 @@ function initModalEvents() {
         conversationHistory = [];
         addSystemNotice("대화 기록이 초기화되었습니다.");
     });
+}
+
+function openApiModal() {
+    inputApiKey.value = getSavedApiKey();
+    showModalError("");
+    apiModal.style.display = "flex";
+}
+
+function showModalError(msg) {
+    if (msg) {
+        apiKeyErrorMsg.textContent = msg;
+        apiKeyErrorMsg.style.display = "block";
+    } else {
+        apiKeyErrorMsg.style.display = "none";
+    }
+}
+
+// Verify API Key via quick API test call
+async function verifyApiKey(key) {
+    const url = getApiUrl(key);
+    const testBody = {
+        contents: [{ role: "user", parts: [{ text: "ping" }] }],
+        generationConfig: { maxOutputTokens: 5 }
+    };
+
+    const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(testBody)
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        const errorMsg = data.error?.message || `HTTP ${res.status}`;
+        throw new Error(errorMsg);
+    }
 }
 
 // Topic & Timer Logic
@@ -245,7 +294,7 @@ function startNewTopic() {
     addSystemNotice(`새로운 주제: "${currentTopic}" (10분 토론 개시)`);
 
     personaTurnIndex = 0;
-    if (debateActive && !isGenerating) {
+    if (debateActive && !isGenerating && isKeyVerified) {
         setTimeout(triggerNextTurn, 1000);
     }
 }
@@ -275,9 +324,17 @@ function updateTimerUI() {
     timerProgressEl.style.width = `${percentage}%`;
 }
 
-// Debate Loop & Gemini API Generation
+// Debate Turn Trigger - STOPS COMPLETELY IF NO VALID KEY
 async function triggerNextTurn() {
     if (!debateActive || isGenerating) return;
+
+    // Check if key is verified
+    if (!isKeyVerified) {
+        clearActiveSpeakers();
+        stopTurnCountdown();
+        setApiKeyErrorState("API Key 미등록 / 오류");
+        return;
+    }
 
     stopTurnCountdown();
     isGenerating = true;
@@ -292,27 +349,27 @@ async function triggerNextTurn() {
     scrollToBottom();
 
     let responseText = "";
-    let isApiSuccess = false;
 
     try {
         responseText = await fetchGeminiResponse(persona);
-        isApiSuccess = true;
-        if (liveDotEl) liveDotEl.classList.remove("error");
-        if (apiStatusTextEl) apiStatusTextEl.textContent = "Gemini 2.0 Connected (Live AI)";
+        setApiKeySuccessState();
     } catch (err) {
-        console.warn("Gemini API Error Detail:", err);
-
-        if (err.message && err.message.includes("leaked")) {
-            if (liveDotEl) liveDotEl.classList.add("error");
-            if (apiStatusTextEl) apiStatusTextEl.textContent = "⚠️ Key 유출로 차단됨 (Key 설정 필요)";
-            addSystemNotice("❌ 구글 API 키가 '유출(Leaked)' 상태로 차단되었습니다. 상단 [Key 설정]에서 새 키를 등록해주세요.");
-        } else if (err.message && err.message.includes("429")) {
-            if (apiStatusTextEl) apiStatusTextEl.textContent = "API 호출한도 초과 (비상 대기 중)";
-        } else {
-            if (apiStatusTextEl) apiStatusTextEl.textContent = "API 연결 대기 중 (Smart Fallback)";
+        console.error("Gemini API call failed:", err);
+        
+        // Remove typing bubble
+        if (typingBubble.parentNode) {
+            typingBubble.parentNode.removeChild(typingBubble);
         }
 
-        responseText = getFallbackResponse(persona);
+        clearActiveSpeakers();
+        isGenerating = false;
+        isKeyVerified = false;
+
+        const errorMsg = parseApiError(err);
+        setApiKeyErrorState(`API Key 오류: ${errorMsg}`);
+        addErrorNotice(`❌ API Key 오류 발생으로 AI 발언이 중지되었습니다: ${errorMsg}\n상단 [🔑 Key 설정]에서 올바른 API Key를 등록해주세요.`);
+        openApiModal();
+        return; // HALT TURN - DO NOT USE FALLBACK
     }
 
     // Remove typing bubble & append real message bubble
@@ -338,7 +395,7 @@ async function triggerNextTurn() {
     personaTurnIndex = (personaTurnIndex + 1) % PERSONAS.length;
 
     // Schedule next speaker with 18~24 seconds interval
-    if (debateActive) {
+    if (debateActive && isKeyVerified) {
         const totalDelay = Math.floor(Math.random() * TURN_DELAY_RANDOM) + TURN_DELAY_BASE;
         startTurnCountdown(Math.floor(totalDelay / 1000), personaTurnIndex);
         setTimeout(triggerNextTurn, totalDelay);
@@ -351,8 +408,8 @@ function startTurnCountdown(seconds, nextIndex) {
     const nextPersona = PERSONAS[nextIndex];
 
     const updateStatus = () => {
-        if (!debateActive || isGenerating) return;
-        if (apiStatusTextEl && !apiStatusTextEl.textContent.includes("차단됨")) {
+        if (!debateActive || isGenerating || !isKeyVerified) return;
+        if (apiStatusTextEl) {
             apiStatusTextEl.textContent = `다음 발언 (${nextPersona.name}): ${turnCountdownSeconds}초 후`;
         }
     };
@@ -375,15 +432,12 @@ function stopTurnCountdown() {
     }
 }
 
-function startDebateLoop() {
-    setTimeout(triggerNextTurn, 1500);
-}
-
-// Call Gemini API with precise error inspection
+// Call Gemini API
 async function fetchGeminiResponse(persona) {
-    const key = getActiveApiKey();
-    const url = getApiUrl(key);
+    const key = getSavedApiKey();
+    if (!key) throw new Error("API Key가 설정되지 않았습니다.");
 
+    const url = getApiUrl(key);
     const recentHistory = conversationHistory.slice(-5);
     const contextPrompt = recentHistory.map(h => `${h.persona}: "${h.text}"`).join("\n");
 
@@ -435,15 +489,29 @@ ${contextPrompt.length > 0 ? contextPrompt : "(토론의 첫 발언)"}
     return reply;
 }
 
-// Non-repeating fallback selector
-function getFallbackResponse(persona) {
-    const list = FALLBACK_QUOTES[persona.id] || FALLBACK_QUOTES.nova;
-    let index = usedFallbackIndices[persona.id] || 0;
-    
-    const quote = list[index % list.length];
-    usedFallbackIndices[persona.id] = (index + 1) % list.length;
-    
-    return quote;
+// Error Message Parser
+function parseApiError(err) {
+    const msg = err.message || "";
+    if (msg.includes("leaked")) return "유출되어 차단된 키 (Leaked Key)";
+    if (msg.includes("API key not valid") || msg.includes("INVALID_ARGUMENT")) return "유효하지 않은 API Key";
+    if (msg.includes("429") || msg.includes("quota")) return "API 호출 한도 초과 (Rate Limit Exceeded)";
+    return msg || "API 연결 실패";
+}
+
+// Status Bar Utilities
+function setApiKeySuccessState() {
+    if (liveDotEl) liveDotEl.className = "live-dot";
+    if (apiStatusTextEl) apiStatusTextEl.textContent = "Gemini 2.0 Connected (Live AI)";
+}
+
+function setApiKeyTestingState() {
+    if (liveDotEl) liveDotEl.className = "live-dot";
+    if (apiStatusTextEl) apiStatusTextEl.textContent = "Gemini Key 검증 중...";
+}
+
+function setApiKeyErrorState(msg) {
+    if (liveDotEl) liveDotEl.className = "live-dot error";
+    if (apiStatusTextEl) apiStatusTextEl.textContent = msg;
 }
 
 // Active Speaker UI Utilities
@@ -503,6 +571,14 @@ function addSystemNotice(msg) {
     const div = document.createElement("div");
     div.className = "system-notice";
     div.textContent = `⚡ ${msg}`;
+    debateFeedEl.appendChild(div);
+    scrollToBottom();
+}
+
+function addErrorNotice(msg) {
+    const div = document.createElement("div");
+    div.className = "system-notice error-notice";
+    div.textContent = msg;
     debateFeedEl.appendChild(div);
     scrollToBottom();
 }
