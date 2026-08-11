@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Fix Movement Bug & Disable Movement on Chat / Inventory Open
+// mysol 2D Pixel Game Engine - Step 5: Dynamic Ambient Lighting & Fog of War System
 
 document.addEventListener('DOMContentLoaded', () => {
     // -------------------------------------------------------------
@@ -97,14 +97,12 @@ document.addEventListener('DOMContentLoaded', () => {
         keys[e.key] = true;
     });
 
-    // Always release keys on keyup to prevent stuck movement!
     window.addEventListener('keyup', (e) => {
         const key = e.key.toLowerCase();
         keys[key] = false;
         keys[e.key] = false;
     });
 
-    // Reset keys on window blur or input focus
     window.addEventListener('blur', resetKeys);
     chatInputEl.addEventListener('focus', resetKeys);
 
@@ -179,18 +177,21 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.clearRect(0, 0, width, height);
         ctx.imageSmoothingEnabled = false;
 
+        // 1. Draw Map & Player (World Coordinates)
         ctx.save();
         ctx.translate(mapStartX, mapStartY);
 
         drawGrassTilemap();
         drawPlayerCharacter();
 
-        // Draw Speech Bubble Above Player Head
         if (activeSpeechBubble) {
             drawSpeechBubble(activeSpeechBubble);
         }
 
         ctx.restore();
+
+        // 2. Draw Lighting Overlay (Screen Coordinates)
+        drawLightingOverlay();
 
         update();
         requestAnimationFrame(render);
@@ -272,7 +273,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.restore();
     }
 
-    // Draw Retro Speech Bubble Above Character Head
     function drawSpeechBubble(bubble) {
         const px = player.x;
         const py = player.y - 34;
@@ -295,24 +295,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
 
-        // Bubble Shadow
         ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
         ctx.beginPath();
         ctx.roundRect(bx + 2, by + 2, bubbleW, bubbleH, 10);
         ctx.fill();
 
-        // Bubble Fill
         ctx.fillStyle = '#0f172a';
         ctx.beginPath();
         ctx.roundRect(bx, by, bubbleW, bubbleH, 10);
         ctx.fill();
 
-        // Bubble Border
         ctx.strokeStyle = '#38bdf8';
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Pointer Tail Down to Head
         ctx.beginPath();
         ctx.moveTo(px - 5, by + bubbleH);
         ctx.lineTo(px, by + bubbleH + 6);
@@ -323,7 +319,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Speech Text
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -332,10 +327,59 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.restore();
     }
 
-    render();
+    // -------------------------------------------------------------
+    // Dynamic Lighting Overlay (3 tiles slightly bright, 6+ tiles pitch black)
+    // -------------------------------------------------------------
+    function drawLightingOverlay() {
+        const px = mapStartX + player.x;
+        const py = mapStartY + player.y;
+
+        // Check if player is holding an active light source item (Flashlight)
+        const equippedItem = hotbar[activeHotbarIndex];
+        const hasFlashlight = equippedItem && equippedItem.id === 'flashlight';
+
+        // Tile Radius Calculations (1 Tile = 64px)
+        const tile3 = 3 * TILE_SIZE; // 192px (3 tiles)
+        const tile6 = 6 * TILE_SIZE; // 384px (6 tiles)
+
+        ctx.save();
+
+        if (hasFlashlight) {
+            // Flashlight Equipped: Expands bright vision radius significantly
+            const innerR = tile3 * 1.5; // ~288px
+            const outerR = tile6 * 1.6; // ~614px
+
+            const grad = ctx.createRadialGradient(px, py, 20, px, py, outerR);
+            grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            grad.addColorStop(innerR / outerR, 'rgba(0, 0, 0, 0.2)');
+            grad.addColorStop(0.8, 'rgba(0, 0, 0, 0.7)');
+            grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.95)');
+
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, width, height);
+        } else {
+            // Dark Ambient Light (Default when no light item is equipped):
+            // Center (0~3 tiles = 192px): Slightly bright
+            // Distance 3~6 tiles (192px ~ 384px): Gradually darkens
+            // Beyond 6 tiles (384px+): Complete pitch black (100% opacity)
+            const innerR = tile3; // 192px
+            const outerR = tile6; // 384px
+
+            const grad = ctx.createRadialGradient(px, py, 15, px, py, outerR);
+            grad.addColorStop(0, 'rgba(0, 0, 0, 0.15)'); // Center
+            grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.55)'); // 3 tiles distance: slightly bright
+            grad.addColorStop(0.8, 'rgba(0, 0, 0, 0.88)'); // Gradually darkens
+            grad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)');  // Beyond 6 tiles: 100% pitch black
+
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, width, height);
+        }
+
+        ctx.restore();
+    }
 
     // -------------------------------------------------------------
-    // 3. CHAT INPUT & SPEECH BUBBLE LOGIC
+    // 3. CHAT INPUT LOGIC
     // -------------------------------------------------------------
     chatInputEl.addEventListener('input', () => {
         if (chatInputEl.value.length > 20) {
