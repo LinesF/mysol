@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 5: Dynamic Ambient Lighting & Fog of War System
+// mysol 2D Pixel Game Engine - Adjustable Ambient Lighting (0.7 Brightness)
 
 document.addEventListener('DOMContentLoaded', () => {
     // -------------------------------------------------------------
@@ -110,7 +110,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const isChatFocused = (document.activeElement === chatInputEl);
         const isInventoryOpen = !inventoryWindowEl.classList.contains('hidden');
 
-        // Completely disable movement when typing in chat OR when inventory is open!
         if (isChatFocused || isInventoryOpen) {
             player.isMoving = false;
             player.animFrame = 0;
@@ -164,7 +163,6 @@ document.addEventListener('DOMContentLoaded', () => {
             player.animTimer = 0;
         }
 
-        // Update Speech Bubble Timer
         if (activeSpeechBubble) {
             activeSpeechBubble.remainingTime -= 1 / 60;
             if (activeSpeechBubble.remainingTime <= 0) {
@@ -328,48 +326,43 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // Dynamic Lighting Overlay (3 tiles slightly bright, 6+ tiles pitch black)
+    // Adjusted Ambient Lighting Overlay (0.7 Brightness around character)
     // -------------------------------------------------------------
     function drawLightingOverlay() {
         const px = mapStartX + player.x;
         const py = mapStartY + player.y;
 
-        // Check if player is holding an active light source item (Flashlight)
         const equippedItem = hotbar[activeHotbarIndex];
         const hasFlashlight = equippedItem && equippedItem.id === 'flashlight';
 
-        // Tile Radius Calculations (1 Tile = 64px)
         const tile3 = 3 * TILE_SIZE; // 192px (3 tiles)
         const tile6 = 6 * TILE_SIZE; // 384px (6 tiles)
 
         ctx.save();
 
         if (hasFlashlight) {
-            // Flashlight Equipped: Expands bright vision radius significantly
-            const innerR = tile3 * 1.5; // ~288px
+            // Flashlight Equipped: Very clear and bright illumination
             const outerR = tile6 * 1.6; // ~614px
 
             const grad = ctx.createRadialGradient(px, py, 20, px, py, outerR);
             grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-            grad.addColorStop(innerR / outerR, 'rgba(0, 0, 0, 0.2)');
-            grad.addColorStop(0.8, 'rgba(0, 0, 0, 0.7)');
-            grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.95)');
+            grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.1)'); // 90% Brightness
+            grad.addColorStop(0.85, 'rgba(0, 0, 0, 0.45)');
+            grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.85)');
 
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, width, height);
         } else {
-            // Dark Ambient Light (Default when no light item is equipped):
-            // Center (0~3 tiles = 192px): Slightly bright
-            // Distance 3~6 tiles (192px ~ 384px): Gradually darkens
-            // Beyond 6 tiles (384px+): Complete pitch black (100% opacity)
-            const innerR = tile3; // 192px
+            // Standard Ambient Light:
+            // 3 tiles radius: ~0.7 Brightness (only 30% darkness opacity)
+            // Distance 3~6 tiles: Gradually darkens to outer edge
             const outerR = tile6; // 384px
 
             const grad = ctx.createRadialGradient(px, py, 15, px, py, outerR);
-            grad.addColorStop(0, 'rgba(0, 0, 0, 0.15)'); // Center
-            grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.55)'); // 3 tiles distance: slightly bright
-            grad.addColorStop(0.8, 'rgba(0, 0, 0, 0.88)'); // Gradually darkens
-            grad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)');  // Beyond 6 tiles: 100% pitch black
+            grad.addColorStop(0, 'rgba(0, 0, 0, 0.1)');     // Center: 90% bright
+            grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.3)');   // 3 tiles: 0.7 Brightness (30% dark)
+            grad.addColorStop(0.85, 'rgba(0, 0, 0, 0.75)'); // Distance 4~5 tiles: gradual darkening
+            grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.95)');  // 6+ tiles: dark edge
 
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, width, height);
