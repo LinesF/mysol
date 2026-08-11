@@ -1,10 +1,10 @@
 :root {
-    --bg-color: #0b0e17;
-    --card-bg: rgba(15, 23, 42, 0.75);
-    --card-border: rgba(255, 255, 255, 0.12);
-    --slot-bg: rgba(30, 41, 59, 0.8);
-    --slot-border: rgba(255, 255, 255, 0.15);
-    --slot-hover: rgba(56, 189, 248, 0.25);
+    --bg-color: #0f172a;
+    --card-bg: rgba(15, 23, 42, 0.85);
+    --card-border: rgba(255, 255, 255, 0.15);
+    --slot-bg: rgba(30, 41, 59, 0.9);
+    --slot-border: rgba(255, 255, 255, 0.18);
+    --slot-hover: rgba(56, 189, 248, 0.3);
     --slot-active: #38bdf8;
     
     --text-color: #f8fafc;
@@ -25,9 +25,8 @@ body {
     background-color: var(--bg-color);
     color: var(--text-color);
     font-family: var(--font-body);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
     overflow: hidden;
     position: relative;
     user-select: none;
@@ -147,23 +146,26 @@ body {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
-/* Canvas Container */
+/* Canvas Container & Absolute Canvas Placement */
 .game-container {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
     width: 100vw;
     height: 100vh;
+    position: relative;
 }
 
 #game-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
     display: block;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
+    z-index: 1;
 }
 
-/* Bottom Left Container Stack (Inventory Above Chat Bar) */
+/* Bottom Left Container Stack */
 .bottom-left-stack {
     position: absolute;
     bottom: 1.5rem;
@@ -274,7 +276,6 @@ body {
     font-size: 0.8rem;
 }
 
-/* Blinking Glow Focus Effect when typing */
 #chat-input:focus {
     color: #ffffff;
 }
@@ -320,7 +321,6 @@ body {
     gap: 8px;
 }
 
-/* Inventory Button */
 .btn-inv-toggle {
     display: flex;
     flex-direction: column;
@@ -411,7 +411,6 @@ body {
     max-width: 50px;
 }
 
-/* Drag Ghost Styling */
 .item-slot[draggable="true"] {
     cursor: grab;
 }

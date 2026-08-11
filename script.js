@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Fully Bright Daylight Mode (No Dark Overlay, Larger 5x5 Map)
+// mysol 2D Pixel Game Engine - Failsafe Full-Screen Canvas & Map Rendering Engine
 
 document.addEventListener('DOMContentLoaded', () => {
     // -------------------------------------------------------------
@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const inventoryWindowEl = document.getElementById('inventory-window');
     const btnToggleInventoryEl = document.getElementById('btn-toggle-inventory');
 
-    // Safe Canvas RoundRect Polyfill to prevent rendering crashes on any browser
     function safeRoundRect(x, y, w, h, r) {
         if (typeof ctx.roundRect === 'function') {
             ctx.roundRect(x, y, w, h, r);
@@ -25,27 +24,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // -------------------------------------------------------------
     // 2. CANVAS & 2D PIXEL GAME ENGINE
     // -------------------------------------------------------------
-    let width = (canvas.width = window.innerWidth || 800);
-    let height = (canvas.height = window.innerHeight || 600);
-
-    window.addEventListener('resize', () => {
-        width = canvas.width = window.innerWidth || 800;
-        height = canvas.height = window.innerHeight || 600;
-        updateMapBounds();
-    });
+    let width = 800;
+    let height = 600;
 
     const GRID_SIZE = 5;
-    const TILE_SIZE = 90; // 90x90 Pixel Tiles (450x450 Total Size - Large & Visible!)
+    const TILE_SIZE = 90; // 90x90 Pixel Tiles (450x450 Total Size)
     const MAP_DIM = GRID_SIZE * TILE_SIZE; // 450x450 Pixels
 
-    let mapStartX = 0;
-    let mapStartY = 0;
+    let mapStartX = 100;
+    let mapStartY = 100;
 
-    function updateMapBounds() {
-        mapStartX = Math.floor((width - MAP_DIM) / 2);
-        mapStartY = Math.floor((height - MAP_DIM) / 2);
+    function resizeCanvas() {
+        width = canvas.width = window.innerWidth || document.documentElement.clientWidth || 800;
+        height = canvas.height = window.innerHeight || document.documentElement.clientHeight || 600;
+        
+        // Ensure mapStartX and mapStartY are ALWAYS positive so map is strictly centered!
+        mapStartX = Math.max(20, Math.floor((width - MAP_DIM) / 2));
+        mapStartY = Math.max(80, Math.floor((height - MAP_DIM) / 2));
     }
-    updateMapBounds();
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
 
     const player = {
         x: MAP_DIM / 2,
@@ -172,10 +171,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function render() {
-        ctx.clearRect(0, 0, width, height);
+        // 1. Clear background with soft Slate Color (Ensures canvas is never pitch black)
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, width, height);
+
         ctx.imageSmoothingEnabled = false;
 
-        // Draw Map & Player (World Coordinates)
+        // 2. Draw Map & Player (World Coordinates)
         ctx.save();
         ctx.translate(mapStartX, mapStartY);
 
@@ -192,33 +194,32 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(render);
     }
 
-    // Draw 5x5 Vibrant Grass Tiles (90x90px each)
+    // Draw 5x5 Bright Grass Tilemap (450x450px)
     function drawGrassTilemap() {
         for (let row = 0; row < GRID_SIZE; row++) {
             for (let col = 0; col < GRID_SIZE; col++) {
                 const tx = col * TILE_SIZE;
                 const ty = row * TILE_SIZE;
 
-                // Bright vibrant checkered green colors
                 const isEven = (row + col) % 2 === 0;
                 ctx.fillStyle = isEven ? '#4ade80' : '#22c55e';
                 ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
 
-                // Grass details
+                // Grass Blades
                 ctx.fillStyle = '#16a34a';
                 ctx.fillRect(tx + 16, ty + 24, 6, 12);
                 ctx.fillRect(tx + 10, ty + 30, 6, 6);
                 ctx.fillRect(tx + 56, ty + 50, 6, 12);
                 ctx.fillRect(tx + 62, ty + 44, 6, 6);
 
-                // Highlight tufts
+                // Grass Highlights
                 ctx.fillStyle = '#86efac';
                 ctx.fillRect(tx + 22, ty + 18, 6, 6);
                 ctx.fillRect(tx + 50, ty + 56, 6, 6);
             }
         }
 
-        // Earth / Gold Outer Border
+        // Golden Outer Border Frame
         ctx.strokeStyle = '#854d0e';
         ctx.lineWidth = 8;
         ctx.strokeRect(0, 0, MAP_DIM, MAP_DIM);
@@ -249,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fillRect(-12, 10, 10, 8);
         ctx.fillRect(2, 10, 10, 8);
 
-        // Tunic / Body (Vibrant Blue)
+        // Tunic / Body (Bright Blue)
         ctx.fillStyle = '#0284c7';
         ctx.fillRect(-14, -6, 28, 18);
         ctx.fillStyle = '#38bdf8';
