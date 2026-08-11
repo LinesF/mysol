@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Crash-Proof Ambient Lighting System (3 Tiles Bright, 6+ Tiles Pitch Black)
+// mysol 2D Pixel Game Engine - Darker Ambient Lighting System
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -348,8 +348,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // Crash-Proof Dynamic Ambient Lighting Overlay
-    // Rules: 3x3 tiles (270px) = slightly bright, 3~6 tiles = gradually darkens, 6+ tiles (540px+) = 100% pitch black
+    // Darker Dynamic Ambient Lighting Overlay
+    // Rules: Character center = 80% bright, 3x3 tiles = 35% bright (65% dark), 5.5+ tiles = 100% pitch black
     // -------------------------------------------------------------
     function drawLightingOverlay() {
         try {
@@ -362,12 +362,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             ctx.save();
 
-            // Create Radial Gradient centered on player position
+            // Create Radial Gradient centered on player position with darker gradient steps
             const grad = ctx.createRadialGradient(px, py, 15, px, py, tile6);
-            grad.addColorStop(0, 'rgba(0, 0, 0, 0.05)');    // Player center: 95% bright
-            grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.35)');  // 3 tiles radius (270px): slightly bright
-            grad.addColorStop(0.85, 'rgba(0, 0, 0, 0.85)'); // Distance 4~5 tiles: progressively darkens
-            grad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)');   // 6+ tiles (540px+): 100% pitch black darkness
+            grad.addColorStop(0, 'rgba(0, 0, 0, 0.2)');     // Center: 80% bright
+            grad.addColorStop(0.48, 'rgba(0, 0, 0, 0.65)');  // 3 tiles radius (270px): 35% bright (65% dark shadow)
+            grad.addColorStop(0.8, 'rgba(0, 0, 0, 0.92)');  // 4~5 tiles: deep darkness
+            grad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)');   // 5.5~6+ tiles: 100% pitch black darkness
 
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, width, height);
