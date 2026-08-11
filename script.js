@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Expanded 10x10 Tilemap System
+// mysol 2D Pixel Game Engine - Step 7: Camera Lock (Y Key), Manual Panning (Arrow Keys, 10 Tile Limit), Auto-Lock on Move, & Off-Screen Character Tracker Arrow
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -14,6 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const inventoryGridEl = document.getElementById('inventory-grid');
     const inventoryWindowEl = document.getElementById('inventory-window');
     const btnToggleInventoryEl = document.getElementById('btn-toggle-inventory');
+    const camLockBadgeEl = document.getElementById('cam-lock-badge');
+    const cameraWarningToastEl = document.getElementById('camera-warning-toast');
 
     function safeRoundRect(x, y, w, h, r) {
         try {
@@ -37,8 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let width = 800;
     let height = 600;
 
-    const GRID_SIZE = 10; // Expanded to 10x10 Grid (100 Tiles Total)
-    const TILE_SIZE = 80;  // 80x80 Pixel Tiles
+    const GRID_SIZE = 10;
+    const TILE_SIZE = 80; // 80x80 Pixel Tiles
     const MAP_DIM = GRID_SIZE * TILE_SIZE; // 800x800 Total Map Size
 
     let mapStartX = 100;
@@ -55,10 +57,10 @@ document.addEventListener('DOMContentLoaded', () => {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Player position starts in the center of the expanded 10x10 map
+    // Player position starts in center of 10x10 map
     const player = {
         x: MAP_DIM / 2,
-        y: MAP_DIM / 2 + 80, // Start slightly below the center campfire
+        y: MAP_DIM / 2 + 80,
         size: 36,
         speed: 3.5,
         direction: 'down',
@@ -67,12 +69,61 @@ document.addEventListener('DOMContentLoaded', () => {
         animTimer: 0
     };
 
-    // Campfire position at exact center of 10x10 map
+    // Campfire position at center of 10x10 map
     const campfire = {
         x: MAP_DIM / 2,
         y: MAP_DIM / 2,
         flickerTimer: 0
     };
+
+    // Camera State & Panning Limits
+    let isCameraLocked = true; // Default: locked on player
+    const cameraPanOffset = { x: 0, y: 0 };
+    const MAX_CAM_PAN_TILES = 10;
+    const MAX_CAM_PAN = MAX_CAM_PAN_TILES * TILE_SIZE; // 800px Max Camera Pan Distance
+    const CAM_PAN_SPEED = 6.0;
+
+    let warningToastTimeout = null;
+
+    function showCameraWarningToast() {
+        if (!cameraWarningToastEl) return;
+        cameraWarningToastEl.classList.remove('hidden');
+        if (warningToastTimeout) clearTimeout(warningToastTimeout);
+        warningToastTimeout = setTimeout(() => {
+            cameraWarningToastEl.classList.add('hidden');
+        }, 1800);
+    }
+
+    function toggleCameraLock(forceState = null) {
+        isCameraLocked = (forceState !== null) ? forceState : !isCameraLocked;
+        if (isCameraLocked) {
+            cameraPanOffset.x = 0;
+            cameraPanOffset.y = 0;
+        }
+        updateCamLockUI();
+    }
+
+    function updateCamLockUI() {
+        if (!camLockBadgeEl) return;
+        const iconEl = camLockBadgeEl.querySelector('.cam-lock-icon');
+        const textEl = camLockBadgeEl.querySelector('.cam-lock-text');
+
+        if (isCameraLocked) {
+            camLockBadgeEl.className = 'cam-lock-badge locked';
+            if (iconEl) iconEl.textContent = '🔒';
+            if (textEl) textEl.textContent = 'CAM LOCK (Y)';
+        } else {
+            camLockBadgeEl.className = 'cam-lock-badge unlocked';
+            if (iconEl) iconEl.textContent = '🔓';
+            if (textEl) textEl.textContent = 'CAM FREE (Y)';
+        }
+    }
+
+    if (camLockBadgeEl) {
+        camLockBadgeEl.addEventListener('click', () => {
+            toggleCameraLock();
+        });
+    }
 
     let activeSpeechBubble = null;
     const keys = {};
@@ -91,6 +142,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (chatInputEl && document.activeElement === chatInputEl) {
+            return;
+        }
+
+        // Toggle Camera Lock with Y key
+        if (e.key === 'y' || e.key === 'Y') {
+            e.preventDefault();
+            toggleCameraLock();
             return;
         }
 
@@ -136,27 +194,50 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Check character movement inputs (WASD)
+        let isWASD = false;
         let dx = 0;
         let dy = 0;
 
-        if (keys['arrowleft'] || keys['a']) {
-            dx -= 1;
-            player.direction = 'left';
-        }
-        if (keys['arrowright'] || keys['d']) {
-            dx += 1;
-            player.direction = 'right';
-        }
-        if (keys['arrowup'] || keys['w']) {
-            dy -= 1;
-            player.direction = 'up';
-        }
-        if (keys['arrowdown'] || keys['s']) {
-            dy += 1;
-            player.direction = 'down';
+        if (keys['w']) { dy -= 1; player.direction = 'up'; isWASD = true; }
+        if (keys['s']) { dy += 1; player.direction = 'down'; isWASD = true; }
+        if (keys['a']) { dx -= 1; player.direction = 'left'; isWASD = true; }
+        if (keys['d']) { dx += 1; player.direction = 'right'; isWASD = true; }
+
+        // If player moves character with WASD, automatically lock camera to character!
+        if (isWASD && !isCameraLocked) {
+            toggleCameraLock(true);
         }
 
-        player.isMoving = (dx !== 0 || dy !== 0);
+        // Camera Panning with Arrow Keys (When Camera Lock is OFF)
+        if (!isCameraLocked && !isWASD) {
+            let panX = 0;
+            let panY = 0;
+
+            if (keys['arrowleft']) panX -= CAM_PAN_SPEED;
+            if (keys['arrowright']) panX += CAM_PAN_SPEED;
+            if (keys['arrowup']) panY -= CAM_PAN_SPEED;
+            if (keys['arrowdown']) panY += CAM_PAN_SPEED;
+
+            if (panX !== 0 || panY !== 0) {
+                const targetX = cameraPanOffset.x + panX;
+                const targetY = cameraPanOffset.y + panY;
+                const dist = Math.hypot(targetX, targetY);
+
+                if (dist > MAX_CAM_PAN) {
+                    // Exceeded 10 tiles limit -> Clamp and show warning toast!
+                    const angle = Math.atan2(targetY, targetX);
+                    cameraPanOffset.x = Math.cos(angle) * MAX_CAM_PAN;
+                    cameraPanOffset.y = Math.sin(angle) * MAX_CAM_PAN;
+                    showCameraWarningToast();
+                } else {
+                    cameraPanOffset.x = targetX;
+                    cameraPanOffset.y = targetY;
+                }
+            }
+        }
+
+        player.isMoving = isWASD && (dx !== 0 || dy !== 0);
 
         if (player.isMoving) {
             if (dx !== 0 && dy !== 0) {
@@ -167,7 +248,6 @@ document.addEventListener('DOMContentLoaded', () => {
             player.x += dx * player.speed;
             player.y += dy * player.speed;
 
-            // Clamp player within the expanded 10x10 tilemap boundary (800x800px)
             const halfSize = player.size / 2;
             player.x = Math.max(halfSize + 4, Math.min(MAP_DIM - halfSize - 4, player.x));
             player.y = Math.max(halfSize + 4, Math.min(MAP_DIM - halfSize - 4, player.y));
@@ -182,7 +262,6 @@ document.addEventListener('DOMContentLoaded', () => {
             player.animTimer = 0;
         }
 
-        // Update campfire flame flicker
         campfire.flickerTimer += 0.15;
 
         if (activeSpeechBubble) {
@@ -195,14 +274,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function render() {
         try {
-            // 1. Fill Canvas Background with Dark Slate Color
+            // Clear background with dark slate color
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(0, 0, width, height);
             ctx.imageSmoothingEnabled = false;
 
-            // 2. Draw World Elements on Main Canvas
+            // Compute Viewport Camera Offset
+            const camOffsetX = isCameraLocked ? 0 : cameraPanOffset.x;
+            const camOffsetY = isCameraLocked ? 0 : cameraPanOffset.y;
+
+            // Draw World Elements on Main Canvas with Camera Translation
             ctx.save();
-            ctx.translate(mapStartX, mapStartY);
+            ctx.translate(mapStartX - camOffsetX, mapStartY - camOffsetY);
 
             drawGrassTilemap();
             drawCampfire();
@@ -214,8 +297,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             ctx.restore();
 
-            // 3. Draw Dynamic Ambient Lighting Mask (Player + Campfire Light Cutouts)
-            drawLightingOverlay();
+            // Draw Dynamic Ambient Lighting Mask
+            drawLightingOverlay(camOffsetX, camOffsetY);
+
+            // Draw Red Arrow Indicator if Character is Off-Screen!
+            drawOffScreenCharacterArrow(camOffsetX, camOffsetY);
 
             update();
         } catch (err) {
@@ -225,7 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(render);
     }
 
-    // Draw Expanded 10x10 Checkered Grass Map (800x800px)
+    // Draw 10x10 Checkered Grass Map
     function drawGrassTilemap() {
         for (let row = 0; row < GRID_SIZE; row++) {
             for (let col = 0; col < GRID_SIZE; col++) {
@@ -236,21 +322,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.fillStyle = isEven ? '#4ade80' : '#22c55e';
                 ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
 
-                // Grass Blades
                 ctx.fillStyle = '#16a34a';
                 ctx.fillRect(tx + 14, ty + 20, 5, 10);
                 ctx.fillRect(tx + 9, ty + 25, 5, 5);
                 ctx.fillRect(tx + 48, ty + 44, 5, 10);
                 ctx.fillRect(tx + 53, ty + 39, 5, 5);
 
-                // Highlights
                 ctx.fillStyle = '#86efac';
                 ctx.fillRect(tx + 19, ty + 15, 5, 5);
                 ctx.fillRect(tx + 43, ty + 49, 5, 5);
             }
         }
 
-        // Golden Outer Border Frame around the 10x10 Grid
         ctx.strokeStyle = '#854d0e';
         ctx.lineWidth = 8;
         ctx.strokeRect(0, 0, MAP_DIM, MAP_DIM);
@@ -260,7 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.strokeRect(-4, -4, MAP_DIM + 8, MAP_DIM + 8);
     }
 
-    // Draw 2D Pixel Animated Campfire at Center of 10x10 Map
+    // Draw Campfire
     function drawCampfire() {
         const cx = campfire.x;
         const cy = campfire.y;
@@ -269,7 +352,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.save();
         ctx.translate(cx, cy);
 
-        // 1. Stone Ring Base
         ctx.fillStyle = '#64748b';
         const stoneAngleStep = (Math.PI * 2) / 8;
         for (let i = 0; i < 8; i++) {
@@ -281,7 +363,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.fill();
         }
 
-        // 2. Crossed Wooden Logs
         ctx.strokeStyle = '#78350f';
         ctx.lineWidth = 6;
         ctx.beginPath();
@@ -295,7 +376,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // 3. Pixel Flames
         ctx.fillStyle = '#f97316';
         ctx.beginPath();
         ctx.moveTo(-12, 2);
@@ -328,32 +408,26 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.save();
         ctx.translate(px, py + bounceY);
 
-        // Shadow
         ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
         ctx.beginPath();
         ctx.ellipse(0, 16, 16, 7, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Boots
         ctx.fillStyle = '#1e293b';
         ctx.fillRect(-12, 10, 10, 8);
         ctx.fillRect(2, 10, 10, 8);
 
-        // Tunic / Body
         ctx.fillStyle = '#0284c7';
         ctx.fillRect(-14, -6, 28, 18);
         ctx.fillStyle = '#38bdf8';
         ctx.fillRect(-12, -6, 24, 5);
 
-        // Hair (Gold)
         ctx.fillStyle = '#fbbf24';
         ctx.fillRect(-16, -24, 32, 12);
 
-        // Face Skin
         ctx.fillStyle = '#fed7aa';
         ctx.fillRect(-14, -14, 28, 12);
 
-        // Eyes
         ctx.fillStyle = '#0f172a';
         if (player.direction === 'down') {
             ctx.fillRect(-7, -11, 5, 5);
@@ -425,68 +499,61 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // OFFSCREEN CANVAS LIGHTING OVERLAY ENGINE (10x10 Map Scale)
+    // OFFSCREEN CANVAS LIGHTING OVERLAY ENGINE (Includes Cam Offset)
     // -------------------------------------------------------------
-    function drawLightingOverlay() {
+    function drawLightingOverlay(camOffsetX, camOffsetY) {
         try {
             if (!maskCtx) return;
 
-            const px = mapStartX + player.x;
-            const py = mapStartY + player.y;
+            const px = mapStartX + player.x - camOffsetX;
+            const py = mapStartY + player.y - camOffsetY;
 
-            const cx = mapStartX + campfire.x;
-            const cy = mapStartY + campfire.y;
+            const cx = mapStartX + campfire.x - camOffsetX;
+            const cy = mapStartY + campfire.y - camOffsetY;
 
-            const tile6 = 6 * TILE_SIZE; // 480px (6 tiles max dark boundary)
+            const tile6 = 6 * TILE_SIZE; // 480px
             const flickerRadius = Math.sin(campfire.flickerTimer * 1.5) * 6;
             const campfireLightRadius = tile6 + flickerRadius;
 
-            // 1. Clear offscreen mask canvas
             maskCtx.clearRect(0, 0, width, height);
-
-            // 2. Fill offscreen mask canvas with ambient darkness (94% darkness)
             maskCtx.fillStyle = 'rgba(11, 14, 23, 0.94)';
             maskCtx.fillRect(0, 0, width, height);
 
-            // 3. Cut out light holes in darkness layer using destination-out
             maskCtx.globalCompositeOperation = 'destination-out';
 
-            // --- Light Source 1: Player Character ---
+            // Light Source 1: Player Character
             const playerGrad = maskCtx.createRadialGradient(px, py, 15, px, py, tile6);
-            playerGrad.addColorStop(0, 'rgba(0, 0, 0, 0.85)');     // Center: 85% light cutout
-            playerGrad.addColorStop(0.48, 'rgba(0, 0, 0, 0.45)');  // 3 tiles: 45% light cutout
-            playerGrad.addColorStop(0.85, 'rgba(0, 0, 0, 0.1)');   // 5 tiles: 10% light cutout
-            playerGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');    // 6+ tiles: 0% cutout
+            playerGrad.addColorStop(0, 'rgba(0, 0, 0, 0.85)');
+            playerGrad.addColorStop(0.48, 'rgba(0, 0, 0, 0.45)');
+            playerGrad.addColorStop(0.85, 'rgba(0, 0, 0, 0.1)');
+            playerGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
 
             maskCtx.fillStyle = playerGrad;
             maskCtx.beginPath();
             maskCtx.arc(px, py, tile6, 0, Math.PI * 2);
             maskCtx.fill();
 
-            // --- Light Source 2: Center Campfire ---
+            // Light Source 2: Center Campfire
             const fireGrad = maskCtx.createRadialGradient(cx, cy, 15, cx, cy, campfireLightRadius);
-            fireGrad.addColorStop(0, 'rgba(0, 0, 0, 0.92)');     // Center: 92% light cutout
-            fireGrad.addColorStop(0.48, 'rgba(0, 0, 0, 0.5)');    // 3 tiles: 50% light cutout
-            fireGrad.addColorStop(0.85, 'rgba(0, 0, 0, 0.12)');  // 5 tiles: 12% light cutout
-            fireGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');    // 6+ tiles: 0% cutout
+            fireGrad.addColorStop(0, 'rgba(0, 0, 0, 0.92)');
+            fireGrad.addColorStop(0.48, 'rgba(0, 0, 0, 0.5)');
+            fireGrad.addColorStop(0.85, 'rgba(0, 0, 0, 0.12)');
+            fireGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
 
             maskCtx.fillStyle = fireGrad;
             maskCtx.beginPath();
             maskCtx.arc(cx, cy, campfireLightRadius, 0, Math.PI * 2);
             maskCtx.fill();
 
-            // Reset mask composite mode
             maskCtx.globalCompositeOperation = 'source-over';
-
-            // 4. Draw darkness mask onto main game canvas
             ctx.drawImage(maskCanvas, 0, 0);
 
-            // 5. Draw warm golden/orange campfire glow overlay on main canvas
+            // Warm campfire glow
             ctx.save();
             const warmGlow = ctx.createRadialGradient(cx, cy, 10, cx, cy, 260 + flickerRadius);
-            warmGlow.addColorStop(0, 'rgba(249, 115, 22, 0.32)');  // Cozy warm orange core
-            warmGlow.addColorStop(0.4, 'rgba(251, 191, 36, 0.16)'); // Golden warmth
-            warmGlow.addColorStop(1.0, 'rgba(251, 191, 36, 0.0)');  // Soft fade out
+            warmGlow.addColorStop(0, 'rgba(249, 115, 22, 0.32)');
+            warmGlow.addColorStop(0.4, 'rgba(251, 191, 36, 0.16)');
+            warmGlow.addColorStop(1.0, 'rgba(251, 191, 36, 0.0)');
 
             ctx.fillStyle = warmGlow;
             ctx.beginPath();
@@ -497,6 +564,70 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error('Lighting overlay error:', err);
         }
+    }
+
+    // -------------------------------------------------------------
+    // OFF-SCREEN CHARACTER TRACKER RED ARROW
+    // Rendered at the edge of the viewport pointing towards off-screen player
+    // -------------------------------------------------------------
+    function drawOffScreenCharacterArrow(camOffsetX, camOffsetY) {
+        const px = mapStartX + player.x - camOffsetX;
+        const py = mapStartY + player.y - camOffsetY;
+
+        const margin = 45;
+        const isOffScreen = (px < margin || px > width - margin || py < margin || py > height - margin);
+
+        if (!isOffScreen) return;
+
+        // Calculate direction angle from screen center to character
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const dx = px - centerX;
+        const dy = py - centerY;
+        const angle = Math.atan2(dy, dx);
+
+        // Clamp arrow indicator near screen edge
+        const edgeX = Math.max(margin, Math.min(width - margin, centerX + Math.cos(angle) * (width / 2 - margin)));
+        const edgeY = Math.max(margin, Math.min(height - margin, centerY + Math.sin(angle) * (height / 2 - margin)));
+
+        ctx.save();
+        ctx.translate(edgeX, edgeY);
+
+        // Pulse effect
+        const pulse = Math.sin(Date.now() * 0.008) * 3;
+
+        // Glow Shadow
+        ctx.shadowColor = 'rgba(244, 63, 94, 0.8)';
+        ctx.shadowBlur = 12;
+
+        // Red Pointer Arrow Body
+        ctx.rotate(angle);
+        ctx.fillStyle = '#f43f5e';
+        ctx.beginPath();
+        ctx.moveTo(16 + pulse, 0);
+        ctx.lineTo(-12, -12);
+        ctx.lineTo(-6, 0);
+        ctx.lineTo(-12, 12);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Distance Tag
+        const distPx = Math.hypot(dx, dy);
+        const distTiles = Math.round(distPx / TILE_SIZE);
+
+        ctx.rotate(-angle); // Reset rotation for text
+        ctx.font = "700 0.75rem 'Fira Code', monospace";
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+        ctx.shadowBlur = 6;
+        ctx.fillText(`${distTiles}칸`, 0, 24);
+
+        ctx.restore();
     }
 
     // -------------------------------------------------------------
@@ -734,6 +865,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderAllUI() {
         renderHotbar();
         renderInventory();
+        updateCamLockUI();
     }
 
     renderAllUI();

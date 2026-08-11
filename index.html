@@ -44,6 +44,11 @@
                     </div>
                 </div>
             </div>
+            <!-- Camera Lock Indicator Badge -->
+            <div id="cam-lock-badge" class="cam-lock-badge locked" title="화면 고정 토글 (Y)">
+                <span class="cam-lock-icon">🔒</span>
+                <span class="cam-lock-text">CAM LOCK (Y)</span>
+            </div>
         </div>
     </header>
 
@@ -51,6 +56,11 @@
     <main class="game-container">
         <canvas id="game-canvas" width="800" height="600"></canvas>
     </main>
+
+    <!-- Camera Distance Limit Warning Toast Banner -->
+    <div id="camera-warning-toast" class="camera-warning-toast hidden">
+        <span>⚠️ 카메라 이동 최대 거리에 도달했습니다 (최대 10칸)</span>
+    </div>
 
     <!-- Bottom Left Stack: Inventory Window (Above Chat Bar) & Chat Bar -->
     <div class="bottom-left-stack">
