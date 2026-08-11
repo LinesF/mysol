@@ -8,7 +8,7 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;800&family=Fira+Code:wght@500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -28,9 +28,32 @@
         </div>
     </header>
 
+    <!-- Canvas -->
     <main class="game-container">
         <canvas id="game-canvas"></canvas>
     </main>
+
+    <!-- Bottom Left Inventory Window (3 cols x 2 rows) -->
+    <div id="inventory-window" class="inventory-window hidden">
+        <div class="inventory-header">
+            <span class="inventory-title">🎒 INVENTORY</span>
+            <span class="inventory-shortcut">Tab</span>
+        </div>
+        <div id="inventory-grid" class="inventory-grid">
+            <!-- 6 Inventory slots (3x2) -->
+        </div>
+    </div>
+
+    <!-- Bottom Right Hotbar & Inventory Toggle Button -->
+    <div class="hotbar-wrapper">
+        <div id="hotbar-grid" class="hotbar-grid">
+            <!-- 3 Hotbar slots (1, 2, 3) -->
+        </div>
+        <button id="btn-toggle-inventory" class="btn-inv-toggle" title="인벤토리 열기/닫기 (Tab)">
+            <span class="inv-icon">🎒</span>
+            <span class="inv-badge">Tab</span>
+        </button>
+    </div>
 
     <script src="script.js"></script>
 </body>

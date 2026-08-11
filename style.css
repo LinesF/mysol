@@ -1,11 +1,18 @@
 :root {
     --bg-color: #0b0e17;
-    --card-bg: rgba(255, 255, 255, 0.04);
-    --card-border: rgba(255, 255, 255, 0.08);
+    --card-bg: rgba(15, 23, 42, 0.75);
+    --card-border: rgba(255, 255, 255, 0.12);
+    --slot-bg: rgba(30, 41, 59, 0.8);
+    --slot-border: rgba(255, 255, 255, 0.15);
+    --slot-hover: rgba(56, 189, 248, 0.25);
+    --slot-active: #38bdf8;
+    
     --text-color: #f8fafc;
     --text-muted: #94a3b8;
+    --accent-gold: #fbbf24;
     --font-heading: 'Outfit', sans-serif;
     --font-body: 'Inter', sans-serif;
+    --font-code: 'Fira Code', monospace;
 }
 
 * {
@@ -24,6 +31,7 @@ body {
     overflow: hidden;
     position: relative;
     user-select: none;
+    -webkit-user-select: none;
 }
 
 /* Top-Left Profile Header */
@@ -110,6 +118,7 @@ body {
     transform: rotate(12deg);
 }
 
+/* Canvas Container */
 .game-container {
     flex: 1;
     display: flex;
@@ -123,4 +132,184 @@ body {
     display: block;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
+}
+
+/* Bottom Right Hotbar & Inventory Toggle Button */
+.hotbar-wrapper {
+    position: absolute;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--card-border);
+    padding: 8px 12px;
+    border-radius: 18px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+.hotbar-grid {
+    display: flex;
+    gap: 8px;
+}
+
+/* Inventory Button */
+.btn-inv-toggle {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 58px;
+    height: 58px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-inv-toggle:hover {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: var(--slot-active);
+    transform: translateY(-2px);
+}
+
+.inv-icon {
+    font-size: 1.4rem;
+}
+
+.inv-badge {
+    font-family: var(--font-code);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+/* Bottom Left Inventory Window (3 cols x 2 rows) */
+.inventory-window {
+    position: absolute;
+    bottom: 1.5rem;
+    left: 1.5rem;
+    z-index: 30;
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    padding: 14px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.inventory-window.hidden {
+    opacity: 0;
+    transform: translateY(20px);
+    pointer-events: none;
+}
+
+.inventory-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.inventory-title {
+    font-family: var(--font-heading);
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-color);
+    letter-spacing: 0.5px;
+}
+
+.inventory-shortcut {
+    font-family: var(--font-code);
+    font-size: 0.68rem;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    padding: 2px 6px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 58px);
+    grid-template-rows: repeat(2, 58px);
+    gap: 8px;
+}
+
+/* Item Slot (Hotbar & Inventory) */
+.item-slot {
+    position: relative;
+    width: 58px;
+    height: 58px;
+    background: var(--slot-bg);
+    border: 2px solid var(--slot-border);
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.item-slot:hover {
+    border-color: var(--slot-active);
+    background: var(--slot-hover);
+}
+
+.item-slot.active {
+    border-color: var(--accent-gold);
+    box-shadow: 0 0 15px rgba(251, 191, 36, 0.4);
+    background: rgba(251, 191, 36, 0.12);
+}
+
+.item-slot.drag-over {
+    border-color: #22c55e;
+    background: rgba(34, 197, 94, 0.25);
+    transform: scale(1.05);
+}
+
+.slot-key-badge {
+    position: absolute;
+    top: 4px;
+    left: 6px;
+    font-family: var(--font-code);
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+
+.item-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+    margin-bottom: 2px;
+}
+
+.item-name-tag {
+    font-size: 0.62rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 50px;
+}
+
+/* Drag Ghost Styling */
+.item-slot[draggable="true"] {
+    cursor: grab;
+}
+.item-slot[draggable="true"]:active {
+    cursor: grabbing;
 }
