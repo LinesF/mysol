@@ -1,11 +1,13 @@
-// mysol 2D Pixel Game Engine - Failsafe Full-Screen Canvas & Map Rendering Engine
+// mysol 2D Pixel Game Engine - 100% Defensive Failsafe Rendering Engine
 
 document.addEventListener('DOMContentLoaded', () => {
-    // -------------------------------------------------------------
-    // 1. ALL DOM ELEMENTS
-    // -------------------------------------------------------------
+    // Safely query DOM elements with optional chaining to prevent any script crashes
     const canvas = document.getElementById('game-canvas');
+    if (!canvas) return;
+
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
     const chatInputEl = document.getElementById('chat-input');
     const chatCharCountEl = document.getElementById('chat-char-count');
     const hotbarGridEl = document.getElementById('hotbar-grid');
@@ -14,22 +16,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnToggleInventoryEl = document.getElementById('btn-toggle-inventory');
 
     function safeRoundRect(x, y, w, h, r) {
-        if (typeof ctx.roundRect === 'function') {
-            ctx.roundRect(x, y, w, h, r);
-        } else {
+        try {
+            if (typeof ctx.roundRect === 'function') {
+                ctx.roundRect(x, y, w, h, r);
+            } else {
+                ctx.rect(x, y, w, h);
+            }
+        } catch (e) {
             ctx.rect(x, y, w, h);
         }
     }
 
-    // -------------------------------------------------------------
-    // 2. CANVAS & 2D PIXEL GAME ENGINE
-    // -------------------------------------------------------------
+    // Canvas & Map Parameters
     let width = 800;
     let height = 600;
 
     const GRID_SIZE = 5;
-    const TILE_SIZE = 90; // 90x90 Pixel Tiles (450x450 Total Size)
-    const MAP_DIM = GRID_SIZE * TILE_SIZE; // 450x450 Pixels
+    const TILE_SIZE = 90; // 90x90 Pixel Tiles (450x450 Total Map)
+    const MAP_DIM = GRID_SIZE * TILE_SIZE; // 450x450
 
     let mapStartX = 100;
     let mapStartY = 100;
@@ -38,9 +42,8 @@ document.addEventListener('DOMContentLoaded', () => {
         width = canvas.width = window.innerWidth || document.documentElement.clientWidth || 800;
         height = canvas.height = window.innerHeight || document.documentElement.clientHeight || 600;
         
-        // Ensure mapStartX and mapStartY are ALWAYS positive so map is strictly centered!
         mapStartX = Math.max(20, Math.floor((width - MAP_DIM) / 2));
-        mapStartY = Math.max(80, Math.floor((height - MAP_DIM) / 2));
+        mapStartY = Math.max(70, Math.floor((height - MAP_DIM) / 2));
     }
 
     resizeCanvas();
@@ -73,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        if (document.activeElement === chatInputEl) {
+        if (chatInputEl && document.activeElement === chatInputEl) {
             return;
         }
 
@@ -87,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === '2') setEquippedSlot(1);
         if (e.key === '3') setEquippedSlot(2);
 
-        if (!inventoryWindowEl.classList.contains('hidden')) {
+        if (inventoryWindowEl && !inventoryWindowEl.classList.contains('hidden')) {
             return;
         }
 
@@ -103,11 +106,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.addEventListener('blur', resetKeys);
-    chatInputEl.addEventListener('focus', resetKeys);
+    if (chatInputEl) {
+        chatInputEl.addEventListener('focus', resetKeys);
+    }
 
     function update() {
-        const isChatFocused = (document.activeElement === chatInputEl);
-        const isInventoryOpen = !inventoryWindowEl.classList.contains('hidden');
+        const isChatFocused = chatInputEl && (document.activeElement === chatInputEl);
+        const isInventoryOpen = inventoryWindowEl && !inventoryWindowEl.classList.contains('hidden');
 
         if (isChatFocused || isInventoryOpen) {
             player.isMoving = false;
@@ -171,30 +176,34 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function render() {
-        // 1. Clear background with soft Slate Color (Ensures canvas is never pitch black)
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(0, 0, width, height);
+        try {
+            // Fill Canvas Background with Slate Color
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, width, height);
+            ctx.imageSmoothingEnabled = false;
 
-        ctx.imageSmoothingEnabled = false;
+            // Draw World Elements
+            ctx.save();
+            ctx.translate(mapStartX, mapStartY);
 
-        // 2. Draw Map & Player (World Coordinates)
-        ctx.save();
-        ctx.translate(mapStartX, mapStartY);
+            drawGrassTilemap();
+            drawPlayerCharacter();
 
-        drawGrassTilemap();
-        drawPlayerCharacter();
+            if (activeSpeechBubble) {
+                drawSpeechBubble(activeSpeechBubble);
+            }
 
-        if (activeSpeechBubble) {
-            drawSpeechBubble(activeSpeechBubble);
+            ctx.restore();
+
+            update();
+        } catch (err) {
+            console.error('Render loop error:', err);
         }
 
-        ctx.restore();
-
-        update();
         requestAnimationFrame(render);
     }
 
-    // Draw 5x5 Bright Grass Tilemap (450x450px)
+    // Draw 5x5 Vibrant Checkered Grass Map (450x450px)
     function drawGrassTilemap() {
         for (let row = 0; row < GRID_SIZE; row++) {
             for (let col = 0; col < GRID_SIZE; col++) {
@@ -212,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.fillRect(tx + 56, ty + 50, 6, 12);
                 ctx.fillRect(tx + 62, ty + 44, 6, 6);
 
-                // Grass Highlights
+                // Highlights
                 ctx.fillStyle = '#86efac';
                 ctx.fillRect(tx + 22, ty + 18, 6, 6);
                 ctx.fillRect(tx + 50, ty + 56, 6, 6);
@@ -229,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.strokeRect(-4, -4, MAP_DIM + 8, MAP_DIM + 8);
     }
 
-    // Draw Player Character
+    // Draw 2D Pixel Character
     function drawPlayerCharacter() {
         const px = player.x;
         const py = player.y;
@@ -250,7 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fillRect(-12, 10, 10, 8);
         ctx.fillRect(2, 10, 10, 8);
 
-        // Tunic / Body (Bright Blue)
+        // Tunic / Body
         ctx.fillStyle = '#0284c7';
         ctx.fillRect(-14, -6, 28, 18);
         ctx.fillStyle = '#38bdf8';
@@ -281,7 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.restore();
     }
 
-    // Draw Speech Bubble
+    // Draw Character Speech Bubble
     function drawSpeechBubble(bubble) {
         const px = player.x;
         const py = player.y - 38;
@@ -336,16 +345,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // 3. CHAT INPUT LOGIC
+    // CHAT INPUT LOGIC
     // -------------------------------------------------------------
-    chatInputEl.addEventListener('input', () => {
-        if (chatInputEl.value.length > 20) {
-            chatInputEl.value = chatInputEl.value.slice(0, 20);
-        }
-        chatCharCountEl.textContent = `${chatInputEl.value.length}/20`;
-    });
+    if (chatInputEl && chatCharCountEl) {
+        chatInputEl.addEventListener('input', () => {
+            if (chatInputEl.value.length > 20) {
+                chatInputEl.value = chatInputEl.value.slice(0, 20);
+            }
+            chatCharCountEl.textContent = `${chatInputEl.value.length}/20`;
+        });
+    }
 
     function handleChatEnterKey() {
+        if (!chatInputEl) return;
         if (document.activeElement !== chatInputEl) {
             resetKeys();
             chatInputEl.focus();
@@ -366,7 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
 
                 chatInputEl.value = '';
-                chatCharCountEl.textContent = '0/20';
+                if (chatCharCountEl) chatCharCountEl.textContent = '0/20';
             }
             chatInputEl.blur();
             resetKeys();
@@ -374,7 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // 4. HOTBAR & INVENTORY SYSTEM
+    // HOTBAR & INVENTORY SYSTEM
     // -------------------------------------------------------------
     const ITEMS = {
         HANDS: { id: 'hands', name: '맨손', icon: '✊' },
@@ -392,13 +404,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeHotbarIndex = 0;
     let dragSource = null;
 
-    btnToggleInventoryEl.addEventListener('click', () => {
-        toggleInventory();
-    });
+    if (btnToggleInventoryEl) {
+        btnToggleInventoryEl.addEventListener('click', () => {
+            toggleInventory();
+        });
+    }
 
     function toggleInventory() {
         resetKeys();
-        inventoryWindowEl.classList.toggle('hidden');
+        if (inventoryWindowEl) {
+            inventoryWindowEl.classList.toggle('hidden');
+        }
     }
 
     function setEquippedSlot(index) {
@@ -409,6 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderHotbar() {
+        if (!hotbarGridEl) return;
         hotbarGridEl.innerHTML = '';
         hotbar.forEach((item, index) => {
             const slotEl = document.createElement('div');
@@ -441,6 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderInventory() {
+        if (!inventoryGridEl) return;
         inventoryGridEl.innerHTML = '';
         inventory.forEach((item, index) => {
             const slotEl = document.createElement('div');
@@ -563,5 +581,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderInventory();
     }
 
+    // Start 60fps Render Loop & Render UI
     renderAllUI();
+    render();
 });

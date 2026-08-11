@@ -52,12 +52,6 @@ body {
     padding: 10px 14px 10px 10px;
     border-radius: 18px;
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
-    transition: all 0.25s ease;
-}
-
-.player-hud:hover {
-    border-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 14px 35px rgba(0, 0, 0, 0.6);
 }
 
 .player-avatar-container {
@@ -68,7 +62,6 @@ body {
     border: 2px solid rgba(255, 255, 255, 0.18);
     background: rgba(0, 0, 0, 0.4);
     flex-shrink: 0;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .player-avatar-img {
@@ -97,7 +90,6 @@ body {
     width: 36px;
     text-align: right;
     color: var(--text-muted);
-    letter-spacing: 0.5px;
 }
 
 .bar-track {
@@ -108,7 +100,6 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.1);
     position: relative;
     overflow: hidden;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
 .bar-fill {
@@ -119,17 +110,14 @@ body {
 
 .bar-fill.red-fill {
     background: linear-gradient(90deg, #f43f5e, #e11d48);
-    box-shadow: 0 0 10px rgba(244, 63, 94, 0.4);
 }
 
 .bar-fill.yellow-fill {
     background: linear-gradient(90deg, #fbbf24, #d97706);
-    box-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
 }
 
 .bar-fill.grey-fill {
     background: linear-gradient(90deg, #64748b, #475569);
-    box-shadow: 0 0 8px rgba(100, 116, 139, 0.3);
 }
 
 .bar-value {
@@ -143,23 +131,25 @@ body {
     font-size: 0.62rem;
     font-weight: 700;
     color: #ffffff;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
-/* Canvas Container & Absolute Canvas Placement */
+/* Canvas Container */
 .game-container {
     width: 100vw;
     height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #1e293b;
     position: relative;
+    overflow: hidden;
 }
 
 #game-canvas {
-    position: absolute;
-    top: 0;
-    left: 0;
+    display: block;
     width: 100vw;
     height: 100vh;
-    display: block;
+    background-color: #1e293b;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
     z-index: 1;
@@ -215,7 +205,6 @@ body {
     font-size: 0.85rem;
     font-weight: 700;
     color: var(--text-color);
-    letter-spacing: 0.5px;
 }
 
 .inventory-shortcut {
@@ -251,7 +240,6 @@ body {
     padding: 6px 12px;
     border-radius: 16px;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-    transition: all 0.25s ease;
 }
 
 .chat-prompt-icon {
@@ -267,8 +255,6 @@ body {
     font-family: var(--font-body);
     font-size: 0.85rem;
     font-weight: 500;
-    user-select: text;
-    -webkit-user-select: text;
 }
 
 #chat-input::placeholder {
@@ -276,19 +262,9 @@ body {
     font-size: 0.8rem;
 }
 
-#chat-input:focus {
-    color: #ffffff;
-}
-
 .chat-input-wrapper:has(#chat-input:focus) {
     border-color: var(--slot-active);
     box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
-    animation: chatPulse 1.8s infinite alternate;
-}
-
-@keyframes chatPulse {
-    0% { border-color: rgba(56, 189, 248, 0.6); box-shadow: 0 0 10px rgba(56, 189, 248, 0.25); }
-    100% { border-color: rgba(56, 189, 248, 1); box-shadow: 0 0 20px rgba(56, 189, 248, 0.5); }
 }
 
 .chat-char-count {
@@ -298,7 +274,7 @@ body {
     font-weight: 700;
 }
 
-/* Bottom Right Hotbar & Inventory Toggle Button */
+/* Bottom Right Hotbar */
 .hotbar-wrapper {
     position: absolute;
     bottom: 1.5rem;
@@ -332,13 +308,11 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 14px;
     cursor: pointer;
-    transition: all 0.2s ease;
 }
 
 .btn-inv-toggle:hover {
     background: rgba(255, 255, 255, 0.14);
     border-color: var(--slot-active);
-    transform: translateY(-2px);
 }
 
 .inv-icon {
@@ -352,7 +326,7 @@ body {
     font-weight: 700;
 }
 
-/* Item Slot (Hotbar & Inventory) */
+/* Item Slot */
 .item-slot {
     position: relative;
     width: 58px;
@@ -365,7 +339,6 @@ body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s ease;
 }
 
 .item-slot:hover {
@@ -382,7 +355,6 @@ body {
 .item-slot.drag-over {
     border-color: #22c55e;
     background: rgba(34, 197, 94, 0.25);
-    transform: scale(1.05);
 }
 
 .slot-key-badge {
@@ -409,11 +381,4 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 50px;
-}
-
-.item-slot[draggable="true"] {
-    cursor: grab;
-}
-.item-slot[draggable="true"]:active {
-    cursor: grabbing;
 }
