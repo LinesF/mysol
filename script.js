@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Offscreen Masking Architecture for Dual Light System
+// mysol 2D Pixel Game Engine - Expanded 10x10 Tilemap System
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -33,13 +33,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const maskCanvas = document.createElement('canvas');
     const maskCtx = maskCanvas.getContext('2d');
 
-    // Canvas & Map Parameters
+    // Canvas & 10x10 Expanded Map Parameters
     let width = 800;
     let height = 600;
 
-    const GRID_SIZE = 5;
-    const TILE_SIZE = 90; // 90x90 Pixel Tiles (450x450 Total Map)
-    const MAP_DIM = GRID_SIZE * TILE_SIZE; // 450x450
+    const GRID_SIZE = 10; // Expanded to 10x10 Grid (100 Tiles Total)
+    const TILE_SIZE = 80;  // 80x80 Pixel Tiles
+    const MAP_DIM = GRID_SIZE * TILE_SIZE; // 800x800 Total Map Size
 
     let mapStartX = 100;
     let mapStartY = 100;
@@ -55,18 +55,19 @@ document.addEventListener('DOMContentLoaded', () => {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
+    // Player position starts in the center of the expanded 10x10 map
     const player = {
         x: MAP_DIM / 2,
-        y: MAP_DIM / 2 + 70, // Start slightly below the center campfire
+        y: MAP_DIM / 2 + 80, // Start slightly below the center campfire
         size: 36,
-        speed: 3.2,
+        speed: 3.5,
         direction: 'down',
         isMoving: false,
         animFrame: 0,
         animTimer: 0
     };
 
-    // Campfire position at exact center of 5x5 map
+    // Campfire position at exact center of 10x10 map
     const campfire = {
         x: MAP_DIM / 2,
         y: MAP_DIM / 2,
@@ -166,6 +167,7 @@ document.addEventListener('DOMContentLoaded', () => {
             player.x += dx * player.speed;
             player.y += dy * player.speed;
 
+            // Clamp player within the expanded 10x10 tilemap boundary (800x800px)
             const halfSize = player.size / 2;
             player.x = Math.max(halfSize + 4, Math.min(MAP_DIM - halfSize - 4, player.x));
             player.y = Math.max(halfSize + 4, Math.min(MAP_DIM - halfSize - 4, player.y));
@@ -212,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             ctx.restore();
 
-            // 3. Draw Dynamic Ambient Lighting Mask (Player + Campfire Light Cutout via Offscreen Canvas)
+            // 3. Draw Dynamic Ambient Lighting Mask (Player + Campfire Light Cutouts)
             drawLightingOverlay();
 
             update();
@@ -223,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(render);
     }
 
-    // Draw 5x5 Checkered Grass Map (450x450px)
+    // Draw Expanded 10x10 Checkered Grass Map (800x800px)
     function drawGrassTilemap() {
         for (let row = 0; row < GRID_SIZE; row++) {
             for (let col = 0; col < GRID_SIZE; col++) {
@@ -236,19 +238,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Grass Blades
                 ctx.fillStyle = '#16a34a';
-                ctx.fillRect(tx + 16, ty + 24, 6, 12);
-                ctx.fillRect(tx + 10, ty + 30, 6, 6);
-                ctx.fillRect(tx + 56, ty + 50, 6, 12);
-                ctx.fillRect(tx + 62, ty + 44, 6, 6);
+                ctx.fillRect(tx + 14, ty + 20, 5, 10);
+                ctx.fillRect(tx + 9, ty + 25, 5, 5);
+                ctx.fillRect(tx + 48, ty + 44, 5, 10);
+                ctx.fillRect(tx + 53, ty + 39, 5, 5);
 
                 // Highlights
                 ctx.fillStyle = '#86efac';
-                ctx.fillRect(tx + 22, ty + 18, 6, 6);
-                ctx.fillRect(tx + 50, ty + 56, 6, 6);
+                ctx.fillRect(tx + 19, ty + 15, 5, 5);
+                ctx.fillRect(tx + 43, ty + 49, 5, 5);
             }
         }
 
-        // Golden Outer Border Frame
+        // Golden Outer Border Frame around the 10x10 Grid
         ctx.strokeStyle = '#854d0e';
         ctx.lineWidth = 8;
         ctx.strokeRect(0, 0, MAP_DIM, MAP_DIM);
@@ -258,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.strokeRect(-4, -4, MAP_DIM + 8, MAP_DIM + 8);
     }
 
-    // Draw 2D Pixel Animated Campfire at Center of Map
+    // Draw 2D Pixel Animated Campfire at Center of 10x10 Map
     function drawCampfire() {
         const cx = campfire.x;
         const cy = campfire.y;
@@ -423,8 +425,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // OFFSCREEN CANVAS LIGHTING OVERLAY ENGINE
-    // Uses maskCanvas to cut out light holes safely without erasing main canvas!
+    // OFFSCREEN CANVAS LIGHTING OVERLAY ENGINE (10x10 Map Scale)
     // -------------------------------------------------------------
     function drawLightingOverlay() {
         try {
@@ -436,7 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const cx = mapStartX + campfire.x;
             const cy = mapStartY + campfire.y;
 
-            const tile6 = 6 * TILE_SIZE; // 540px (6 tiles max dark boundary)
+            const tile6 = 6 * TILE_SIZE; // 480px (6 tiles max dark boundary)
             const flickerRadius = Math.sin(campfire.flickerTimer * 1.5) * 6;
             const campfireLightRadius = tile6 + flickerRadius;
 
@@ -447,7 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
             maskCtx.fillStyle = 'rgba(11, 14, 23, 0.94)';
             maskCtx.fillRect(0, 0, width, height);
 
-            // 3. Cut out light holes in the darkness layer using destination-out
+            // 3. Cut out light holes in darkness layer using destination-out
             maskCtx.globalCompositeOperation = 'destination-out';
 
             // --- Light Source 1: Player Character ---
@@ -482,14 +483,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 5. Draw warm golden/orange campfire glow overlay on main canvas
             ctx.save();
-            const warmGlow = ctx.createRadialGradient(cx, cy, 10, cx, cy, 270 + flickerRadius);
-            warmGlow.addColorStop(0, 'rgba(249, 115, 22, 0.3)');   // Cozy warm orange core
-            warmGlow.addColorStop(0.4, 'rgba(251, 191, 36, 0.15)'); // Golden warmth
+            const warmGlow = ctx.createRadialGradient(cx, cy, 10, cx, cy, 260 + flickerRadius);
+            warmGlow.addColorStop(0, 'rgba(249, 115, 22, 0.32)');  // Cozy warm orange core
+            warmGlow.addColorStop(0.4, 'rgba(251, 191, 36, 0.16)'); // Golden warmth
             warmGlow.addColorStop(1.0, 'rgba(251, 191, 36, 0.0)');  // Soft fade out
 
             ctx.fillStyle = warmGlow;
             ctx.beginPath();
-            ctx.arc(cx, cy, 270 + flickerRadius, 0, Math.PI * 2);
+            ctx.arc(cx, cy, 260 + flickerRadius, 0, Math.PI * 2);
             ctx.fill();
             ctx.restore();
 
