@@ -1,5 +1,5 @@
 :root {
-    --bg-color: #0b0d14;
+    --bg-color: #0b0e17;
     --card-bg: rgba(255, 255, 255, 0.04);
     --card-border: rgba(255, 255, 255, 0.08);
     --text-color: #f8fafc;
@@ -21,15 +21,17 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
     position: relative;
+    user-select: none;
 }
 
 /* Top-Left Profile Header */
 .top-header {
     position: absolute;
-    top: 1.5rem;
-    left: 1.5rem;
-    z-index: 10;
+    top: 1.25rem;
+    left: 1.25rem;
+    z-index: 20;
 }
 
 .profile-group {
@@ -60,8 +62,8 @@ body {
 }
 
 .profile-img {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     object-fit: cover;
     border: 1px solid rgba(255, 255, 255, 0.2);
@@ -73,7 +75,7 @@ body {
 }
 
 .profile-name {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 600;
     color: var(--text-color);
     letter-spacing: -0.2px;
@@ -86,9 +88,9 @@ body {
     background: rgba(255, 255, 255, 0.08);
     color: var(--text-muted);
     text-decoration: none;
-    padding: 6px 12px;
+    padding: 5px 10px;
     border-radius: 20px;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     font-weight: 500;
     border: 1px solid rgba(255, 255, 255, 0.08);
     transition: all 0.25s ease;
@@ -108,19 +110,17 @@ body {
     transform: rotate(12deg);
 }
 
-/* Main Container */
-.container {
+.game-container {
     flex: 1;
     display: flex;
     justify-content: center;
     align-items: center;
-    text-align: center;
+    width: 100vw;
+    height: 100vh;
 }
 
-.logo {
-    font-family: var(--font-heading);
-    font-size: 3.5rem;
-    font-weight: 700;
-    letter-spacing: -1px;
-    opacity: 0.9;
+#game-canvas {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
 }
