@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Center-Anchored Camera Scrolling & Auto-Unlock Arrow Key Panning
+// mysol 2D Pixel Game Engine - Step 9: Fixed Bare Hands (Slot 1) & Inventory-Gated Quick Move
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Player position in 10x10 world coordinates (0 to 800)
+    // Player position in 10x10 world coordinates
     const player = {
         x: MAP_DIM / 2,
         y: MAP_DIM / 2 + 80,
@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
         animTimer: 0
     };
 
-    // Campfire position at exact center of 10x10 map
+    // Campfire position at center of 10x10 map
     const campfire = {
         x: MAP_DIM / 2,
         y: MAP_DIM / 2,
@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Camera & Viewport Management
-    let isCameraLocked = true; // Default: Character stays centered on screen
+    let isCameraLocked = true;
     const cameraPanOffset = { x: 0, y: 0 };
     const MAX_CAM_PAN_TILES = 10;
     const MAX_CAM_PAN = MAX_CAM_PAN_TILES * TILE_SIZE; // 800px Max Camera Pan
@@ -139,7 +139,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Toggle Camera Lock with Y key
         if (e.key === 'y' || e.key === 'Y') {
             e.preventDefault();
             toggleCameraLock();
@@ -160,7 +159,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // If Arrow Key is pressed while WASD is NOT held, automatically UNLOCK camera for panning!
         const isArrowKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key);
         const isWASDPressed = keys['w'] || keys['s'] || keys['a'] || keys['d'];
 
@@ -196,7 +194,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // WASD Movement Keys
         let isWASD = false;
         let dx = 0;
         let dy = 0;
@@ -206,12 +203,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (keys['a']) { dx -= 1; player.direction = 'left'; isWASD = true; }
         if (keys['d']) { dx += 1; player.direction = 'right'; isWASD = true; }
 
-        // If player starts moving character with WASD, AUTOMATICALLY RE-LOCK CAMERA to character!
         if (isWASD && !isCameraLocked) {
             toggleCameraLock(true);
         }
 
-        // Camera Panning with Arrow Keys (When Camera Lock is OFF & WASD is not held)
         if (!isCameraLocked && !isWASD) {
             let panX = 0;
             let panY = 0;
@@ -227,7 +222,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dist = Math.hypot(targetX, targetY);
 
                 if (dist > MAX_CAM_PAN) {
-                    // Exceeded 10 tiles limit -> Clamp and show warning toast!
                     const angle = Math.atan2(targetY, targetX);
                     cameraPanOffset.x = Math.cos(angle) * MAX_CAM_PAN;
                     cameraPanOffset.y = Math.sin(angle) * MAX_CAM_PAN;
@@ -276,20 +270,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function render() {
         try {
-            // Fill Canvas Background
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(0, 0, width, height);
             ctx.imageSmoothingEnabled = false;
 
-            // Screen Center Point
             const screenCenterX = width / 2;
             const screenCenterY = height / 2;
 
-            // Map Translation: Character is centered at (width/2, height/2), map scrolls around it!
             const mapRenderX = isCameraLocked ? (screenCenterX - player.x) : (screenCenterX - player.x - cameraPanOffset.x);
             const mapRenderY = isCameraLocked ? (screenCenterY - player.y) : (screenCenterY - player.y - cameraPanOffset.y);
 
-            // Draw World Elements on Main Canvas
             ctx.save();
             ctx.translate(mapRenderX, mapRenderY);
 
@@ -303,10 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             ctx.restore();
 
-            // Draw Dynamic Ambient Lighting Mask
             drawLightingOverlay(mapRenderX, mapRenderY);
-
-            // Draw Red Arrow Indicator if Character is Off-Screen!
             drawOffScreenCharacterArrow(mapRenderX, mapRenderY);
 
             update();
@@ -317,7 +304,6 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(render);
     }
 
-    // Draw 10x10 Checkered Grass Map
     function drawGrassTilemap() {
         for (let row = 0; row < GRID_SIZE; row++) {
             for (let col = 0; col < GRID_SIZE; col++) {
@@ -349,7 +335,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.strokeRect(-4, -4, MAP_DIM + 8, MAP_DIM + 8);
     }
 
-    // Draw Campfire at center of 10x10 map
     function drawCampfire() {
         const cx = campfire.x;
         const cy = campfire.y;
@@ -404,7 +389,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.restore();
     }
 
-    // Draw 2D Pixel Character
     function drawPlayerCharacter() {
         const px = player.x;
         const py = player.y;
@@ -450,7 +434,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.restore();
     }
 
-    // Draw Character Speech Bubble
     function drawSpeechBubble(bubble) {
         const px = player.x;
         const py = player.y - 38;
@@ -504,10 +487,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.restore();
     }
 
-    // -------------------------------------------------------------
-    // OFFSCREEN CANVAS LIGHTING OVERLAY ENGINE
-    // Transforms light cutouts accurately based on Map Render Translation!
-    // -------------------------------------------------------------
     function drawLightingOverlay(mapRenderX, mapRenderY) {
         try {
             if (!maskCtx) return;
@@ -573,9 +552,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // -------------------------------------------------------------
-    // OFF-SCREEN CHARACTER TRACKER RED ARROW
-    // -------------------------------------------------------------
     function drawOffScreenCharacterArrow(mapRenderX, mapRenderY) {
         const px = mapRenderX + player.x;
         const py = mapRenderY + player.y;
@@ -672,10 +648,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // HOTBAR & INVENTORY SYSTEM
+    // HOTBAR & INVENTORY SYSTEM (Bare Hands Fixed in Slot 1)
     // -------------------------------------------------------------
     const ITEMS = {
-        HANDS: { id: 'hands', name: '맨손', icon: '✊' },
+        HANDS: { id: 'hands', name: '맨손', icon: '✊', locked: true }, // Slot 1 Locked!
         FLASHLIGHT: { id: 'flashlight', name: '후레쉬', icon: '🔦' },
         PHONE: { id: 'phone', name: '핸드폰', icon: '📱' }
     };
@@ -715,7 +691,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hotbarGridEl.innerHTML = '';
         hotbar.forEach((item, index) => {
             const slotEl = document.createElement('div');
-            slotEl.className = `item-slot ${index === activeHotbarIndex ? 'active' : ''}`;
+            slotEl.className = `item-slot ${index === activeHotbarIndex ? 'active' : ''} ${item && item.locked ? 'locked-slot' : ''}`;
             slotEl.dataset.container = 'hotbar';
             slotEl.dataset.index = index;
 
@@ -725,7 +701,10 @@ document.addEventListener('DOMContentLoaded', () => {
             slotEl.appendChild(keyBadge);
 
             if (item) {
-                slotEl.setAttribute('draggable', 'true');
+                // If item is locked (Bare Hands), disable drag attribute
+                if (!item.locked) {
+                    slotEl.setAttribute('draggable', 'true');
+                }
                 
                 const iconEl = document.createElement('span');
                 iconEl.className = 'item-icon';
@@ -753,7 +732,9 @@ document.addEventListener('DOMContentLoaded', () => {
             slotEl.dataset.index = index;
 
             if (item) {
-                slotEl.setAttribute('draggable', 'true');
+                if (!item.locked) {
+                    slotEl.setAttribute('draggable', 'true');
+                }
 
                 const iconEl = document.createElement('span');
                 iconEl.className = 'item-icon';
@@ -774,13 +755,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function attachSlotEvents(slotEl, container, index) {
         slotEl.addEventListener('click', (e) => {
             e.stopPropagation();
+            const isInventoryOpen = inventoryWindowEl && !inventoryWindowEl.classList.contains('hidden');
+
             if (container === 'hotbar') {
                 setEquippedSlot(index);
-                if (hotbar[index]) {
+                const item = hotbar[index];
+                // Quick move ONLY if Inventory Window is currently OPEN AND item is NOT locked!
+                if (isInventoryOpen && item && !item.locked) {
                     quickMoveItem('hotbar', index);
                 }
             } else if (container === 'inventory') {
-                if (inventory[index]) {
+                const item = inventory[index];
+                // Quick move from inventory ONLY if Inventory Window is OPEN
+                if (isInventoryOpen && item && !item.locked) {
                     quickMoveItem('inventory', index);
                 }
             }
@@ -788,7 +775,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         slotEl.addEventListener('dragstart', (e) => {
             const item = container === 'hotbar' ? hotbar[index] : inventory[index];
-            if (!item) {
+            // Prevent dragging locked item (Bare Hands in Slot 1)
+            if (!item || item.locked) {
                 e.preventDefault();
                 return;
             }
@@ -804,6 +792,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         slotEl.addEventListener('dragover', (e) => {
+            // Prevent dragging over locked Slot 1 (Bare Hands)
+            if (container === 'hotbar' && index === 0) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             slotEl.classList.add('drag-over');
@@ -818,6 +808,10 @@ document.addEventListener('DOMContentLoaded', () => {
             slotEl.classList.remove('drag-over');
             if (!dragSource) return;
 
+            // Block dropping into or out of locked Slot 1 (Bare Hands)
+            if (container === 'hotbar' && index === 0) return;
+            if (dragSource.container === 'hotbar' && dragSource.index === 0) return;
+
             swapItems(dragSource.container, dragSource.index, container, index);
             dragSource = null;
         });
@@ -825,8 +819,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function quickMoveItem(srcContainer, srcIndex) {
         if (srcContainer === 'hotbar') {
+            if (srcIndex === 0) return; // Slot 1 (Bare Hands) is locked!
             const item = hotbar[srcIndex];
-            if (!item) return;
+            if (!item || item.locked) return;
 
             const emptyInvIndex = inventory.findIndex(slot => slot === null);
             if (emptyInvIndex !== -1) {
@@ -836,9 +831,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else if (srcContainer === 'inventory') {
             const item = inventory[srcIndex];
-            if (!item) return;
+            if (!item || item.locked) return;
 
-            const emptyHotbarIndex = hotbar.findIndex(slot => slot === null);
+            // Find first empty slot in hotbar EXCEPT slot 0 (which is fixed with Bare Hands)
+            const emptyHotbarIndex = hotbar.findIndex((slot, idx) => idx > 0 && slot === null);
             if (emptyHotbarIndex !== -1) {
                 hotbar[emptyHotbarIndex] = item;
                 inventory[srcIndex] = null;
@@ -849,6 +845,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function swapItems(srcContainer, srcIdx, targetContainer, targetIdx) {
         if (srcContainer === targetContainer && srcIdx === targetIdx) return;
+        if (srcContainer === 'hotbar' && srcIdx === 0) return;
+        if (targetContainer === 'hotbar' && targetIdx === 0) return;
 
         let srcItem = srcContainer === 'hotbar' ? hotbar[srcIdx] : inventory[srcIdx];
         let targetItem = targetContainer === 'hotbar' ? hotbar[targetIdx] : inventory[targetIdx];
