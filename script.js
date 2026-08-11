@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 2: Hotbar, Inventory (Tab/Button), Quick Move & Drag-Drop System
+// mysol 2D Pixel Game Engine - Step 3: Hotbar, Inventory, and Character Speech Bubble Chat
 
 document.addEventListener('DOMContentLoaded', () => {
     // -------------------------------------------------------------
@@ -40,10 +40,26 @@ document.addEventListener('DOMContentLoaded', () => {
         animTimer: 0
     };
 
+    // Active Speech Bubble State
+    // Duration rules: 1~10 chars -> 4.5s, 11~15 chars -> 6s, 16~20 chars -> 7.5s
+    let activeSpeechBubble = null; // { text, totalDuration, remainingTime }
+
     const keys = {};
 
     window.addEventListener('keydown', (e) => {
         const key = e.key.toLowerCase();
+
+        // Handle Enter Key for Chat Input
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleChatEnterKey();
+            return;
+        }
+
+        // Disable player movement / shortcut keys if typing in chat
+        if (document.activeElement === chatInputEl) {
+            return;
+        }
 
         // Prevent Tab key default focus navigation
         if (e.key === 'Tab') {
@@ -62,12 +78,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.addEventListener('keyup', (e) => {
+        if (document.activeElement === chatInputEl) return;
         const key = e.key.toLowerCase();
         keys[key] = false;
         keys[e.key] = false;
     });
 
     function update() {
+        // Stop character movement if typing in chat
+        if (document.activeElement === chatInputEl) {
+            player.isMoving = false;
+            player.animFrame = 0;
+            player.animTimer = 0;
+            return;
+        }
+
         let dx = 0;
         let dy = 0;
 
@@ -112,6 +137,14 @@ document.addEventListener('DOMContentLoaded', () => {
             player.animFrame = 0;
             player.animTimer = 0;
         }
+
+        // Update Speech Bubble Timer
+        if (activeSpeechBubble) {
+            activeSpeechBubble.remainingTime -= 1 / 60; // 60 FPS
+            if (activeSpeechBubble.remainingTime <= 0) {
+                activeSpeechBubble = null;
+            }
+        }
     }
 
     function render() {
@@ -123,6 +156,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         drawGrassTilemap();
         drawPlayerCharacter();
+
+        // Draw Speech Bubble Above Player Head
+        if (activeSpeechBubble) {
+            drawSpeechBubble(activeSpeechBubble);
+        }
 
         ctx.restore();
 
@@ -206,42 +244,136 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.restore();
     }
 
+    // Draw Retro Speech Bubble Above Character Head
+    function drawSpeechBubble(bubble) {
+        const px = player.x;
+        const py = player.y - 34; // Directly above character cap
+
+        ctx.save();
+        ctx.font = "600 0.8rem 'Inter', sans-serif";
+
+        const textMetrics = ctx.measureText(bubble.text);
+        const textWidth = textMetrics.width;
+        const paddingX = 12;
+        const paddingY = 6;
+        const bubbleW = textWidth + paddingX * 2;
+        const bubbleH = 26;
+        const bx = px - bubbleW / 2;
+        const by = py - bubbleH - 8;
+
+        // Smooth fade out during final 0.5 seconds
+        let alpha = 1.0;
+        if (bubble.remainingTime < 0.5) {
+            alpha = bubble.remainingTime / 0.5;
+        }
+        ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+
+        // Bubble Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.beginPath();
+        ctx.roundRect(bx + 2, by + 2, bubbleW, bubbleH, 10);
+        ctx.fill();
+
+        // Bubble Fill (Dark Glass / Retro Card)
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bubbleW, bubbleH, 10);
+        ctx.fill();
+
+        // Bubble Border
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Pointer Tail Down to Head
+        ctx.beginPath();
+        ctx.moveTo(px - 5, by + bubbleH);
+        ctx.lineTo(px, by + bubbleH + 6);
+        ctx.lineTo(px + 5, by + bubbleH);
+        ctx.fillStyle = '#0f172a';
+        ctx.fill();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Speech Text
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(bubble.text, px, by + bubbleH / 2);
+
+        ctx.restore();
+    }
+
     render();
 
     // -------------------------------------------------------------
-    // 2. HOTBAR & INVENTORY SYSTEM (3 HOTBAR SLOTS + 3x2 INVENTORY)
+    // 2. CHAT INPUT & SPEECH BUBBLE LOGIC
     // -------------------------------------------------------------
+    const chatInputEl = document.getElementById('chat-input');
+    const chatCharCountEl = document.getElementById('chat-char-count');
 
-    // Items Data
+    // Update character count indicator (0/20)
+    chatInputEl.addEventListener('input', () => {
+        if (chatInputEl.value.length > 20) {
+            chatInputEl.value = chatInputEl.value.slice(0, 20);
+        }
+        chatCharCountEl.textContent = `${chatInputEl.value.length}/20`;
+    });
+
+    function handleChatEnterKey() {
+        if (document.activeElement !== chatInputEl) {
+            // Focus chat input field
+            chatInputEl.focus();
+        } else {
+            // Already in chat input -> Submit message if not empty
+            const text = chatInputEl.value.trim();
+            if (text.length > 0) {
+                // Calculate display duration: <=10: 4.5s, <=15: 6.0s, <=20: 7.5s
+                let duration = 4.5;
+                if (text.length > 15) {
+                    duration = 7.5;
+                } else if (text.length > 10) {
+                    duration = 6.0;
+                }
+
+                activeSpeechBubble = {
+                    text: text,
+                    totalDuration: duration,
+                    remainingTime: duration
+                };
+
+                chatInputEl.value = '';
+                chatCharCountEl.textContent = '0/20';
+            }
+            chatInputEl.blur();
+        }
+    }
+
+    // -------------------------------------------------------------
+    // 3. HOTBAR & INVENTORY SYSTEM
+    // -------------------------------------------------------------
     const ITEMS = {
         HANDS: { id: 'hands', name: '맨손', icon: '✊' },
         FLASHLIGHT: { id: 'flashlight', name: '후레쉬', icon: '🔦' },
         PHONE: { id: 'phone', name: '핸드폰', icon: '📱' }
     };
 
-    // Hotbar Array (3 Slots)
     let hotbar = [
         { ...ITEMS.HANDS },
         { ...ITEMS.FLASHLIGHT },
         { ...ITEMS.PHONE }
     ];
 
-    // Inventory Array (6 Slots: 3 cols x 2 rows)
     let inventory = [null, null, null, null, null, null];
-
-    // Currently equipped hotbar slot index (0, 1, 2)
     let activeHotbarIndex = 0;
+    let dragSource = null;
 
-    // Drag & Drop Source Tracker
-    let dragSource = null; // { container: 'hotbar'|'inventory', index: number }
-
-    // DOM Elements
     const hotbarGridEl = document.getElementById('hotbar-grid');
     const inventoryGridEl = document.getElementById('inventory-grid');
     const inventoryWindowEl = document.getElementById('inventory-window');
     const btnToggleInventoryEl = document.getElementById('btn-toggle-inventory');
 
-    // Initialize Inventory Toggle Button
     btnToggleInventoryEl.addEventListener('click', () => {
         toggleInventory();
     });
@@ -257,7 +389,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Render Hotbar Slots
     function renderHotbar() {
         hotbarGridEl.innerHTML = '';
         hotbar.forEach((item, index) => {
@@ -266,7 +397,6 @@ document.addEventListener('DOMContentLoaded', () => {
             slotEl.dataset.container = 'hotbar';
             slotEl.dataset.index = index;
 
-            // Slot Key Badge (1, 2, 3)
             const keyBadge = document.createElement('span');
             keyBadge.className = 'slot-key-badge';
             keyBadge.textContent = index + 1;
@@ -291,7 +421,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Render Inventory Slots
     function renderInventory() {
         inventoryGridEl.innerHTML = '';
         inventory.forEach((item, index) => {
@@ -319,27 +448,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Attach Click (Quick Move) & Drag/Drop Events to Slots
     function attachSlotEvents(slotEl, container, index) {
-        // 1. Quick Move on Click
         slotEl.addEventListener('click', (e) => {
             e.stopPropagation();
             if (container === 'hotbar') {
-                // If hotbar slot clicked, select it as active slot
                 setEquippedSlot(index);
-                // Quick move to inventory if item exists
                 if (hotbar[index]) {
                     quickMoveItem('hotbar', index);
                 }
             } else if (container === 'inventory') {
-                // Quick move from inventory to hotbar
                 if (inventory[index]) {
                     quickMoveItem('inventory', index);
                 }
             }
         });
 
-        // 2. Drag & Drop Handlers
         slotEl.addEventListener('dragstart', (e) => {
             const item = container === 'hotbar' ? hotbar[index] : inventory[index];
             if (!item) {
@@ -372,21 +495,16 @@ document.addEventListener('DOMContentLoaded', () => {
             slotEl.classList.remove('drag-over');
             if (!dragSource) return;
 
-            const targetContainer = container;
-            const targetIndex = index;
-
-            swapItems(dragSource.container, dragSource.index, targetContainer, targetIndex);
+            swapItems(dragSource.container, dragSource.index, container, index);
             dragSource = null;
         });
     }
 
-    // Quick Move Logic (Hotbar <-> Inventory)
     function quickMoveItem(srcContainer, srcIndex) {
         if (srcContainer === 'hotbar') {
             const item = hotbar[srcIndex];
             if (!item) return;
 
-            // Find first empty slot in inventory
             const emptyInvIndex = inventory.findIndex(slot => slot === null);
             if (emptyInvIndex !== -1) {
                 inventory[emptyInvIndex] = item;
@@ -397,7 +515,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const item = inventory[srcIndex];
             if (!item) return;
 
-            // Find first empty slot in hotbar
             const emptyHotbarIndex = hotbar.findIndex(slot => slot === null);
             if (emptyHotbarIndex !== -1) {
                 hotbar[emptyHotbarIndex] = item;
@@ -407,7 +524,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Swap / Move Items between any two slots
     function swapItems(srcContainer, srcIdx, targetContainer, targetIdx) {
         if (srcContainer === targetContainer && srcIdx === targetIdx) return;
 
@@ -428,6 +544,5 @@ document.addEventListener('DOMContentLoaded', () => {
         renderInventory();
     }
 
-    // Initial UI Render
     renderAllUI();
 });

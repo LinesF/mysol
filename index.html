@@ -52,14 +52,26 @@
         <canvas id="game-canvas"></canvas>
     </main>
 
-    <!-- Bottom Left Inventory Window (3 cols x 2 rows) -->
-    <div id="inventory-window" class="inventory-window hidden">
-        <div class="inventory-header">
-            <span class="inventory-title">🎒 INVENTORY</span>
-            <span class="inventory-shortcut">Tab</span>
+    <!-- Bottom Left Stack: Inventory Window (Above Chat Bar) & Chat Bar -->
+    <div class="bottom-left-stack">
+        <!-- Inventory Window (3 cols x 2 rows) -->
+        <div id="inventory-window" class="inventory-window hidden">
+            <div class="inventory-header">
+                <span class="inventory-title">🎒 INVENTORY</span>
+                <span class="inventory-shortcut">Tab</span>
+            </div>
+            <div id="inventory-grid" class="inventory-grid">
+                <!-- 6 Inventory slots (3x2) -->
+            </div>
         </div>
-        <div id="inventory-grid" class="inventory-grid">
-            <!-- 6 Inventory slots (3x2) -->
+
+        <!-- Chat Input Bar -->
+        <div class="chat-bar-container">
+            <div class="chat-input-wrapper">
+                <span class="chat-prompt-icon">💬</span>
+                <input type="text" id="chat-input" placeholder="엔터(Enter) 키를 눌러 대화..." maxlength="20" autocomplete="off">
+                <span id="chat-char-count" class="chat-char-count">0/20</span>
+            </div>
         </div>
     </div>
 

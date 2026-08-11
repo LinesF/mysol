@@ -78,7 +78,6 @@ body {
     object-fit: cover;
 }
 
-/* Status Bars Container (Red, Yellow, Grey) */
 .status-bars-container {
     display: flex;
     flex-direction: column;
@@ -119,19 +118,16 @@ body {
     transition: width 0.3s ease;
 }
 
-/* Red Bar: Health (100) */
 .bar-fill.red-fill {
     background: linear-gradient(90deg, #f43f5e, #e11d48);
     box-shadow: 0 0 10px rgba(244, 63, 94, 0.4);
 }
 
-/* Yellow Bar: Energy / Skill Stamina (50) */
 .bar-fill.yellow-fill {
     background: linear-gradient(90deg, #fbbf24, #d97706);
     box-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
 }
 
-/* Grey Bar: Equipment Utility (0) */
 .bar-fill.grey-fill {
     background: linear-gradient(90deg, #64748b, #475569);
     box-shadow: 0 0 8px rgba(100, 116, 139, 0.3);
@@ -165,6 +161,140 @@ body {
     display: block;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
+}
+
+/* Bottom Left Container Stack (Inventory Above Chat Bar) */
+.bottom-left-stack {
+    position: absolute;
+    bottom: 1.5rem;
+    left: 1.5rem;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Inventory Window (3 cols x 2 rows) */
+.inventory-window {
+    background: var(--card-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    padding: 14px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.inventory-window.hidden {
+    opacity: 0;
+    transform: translateY(15px);
+    pointer-events: none;
+    height: 0;
+    padding: 0;
+    margin: 0;
+    border: none;
+    overflow: hidden;
+}
+
+.inventory-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.inventory-title {
+    font-family: var(--font-heading);
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text-color);
+    letter-spacing: 0.5px;
+}
+
+.inventory-shortcut {
+    font-family: var(--font-code);
+    font-size: 0.68rem;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    padding: 2px 6px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 58px);
+    grid-template-rows: repeat(2, 58px);
+    gap: 8px;
+}
+
+/* Chat Input Bar */
+.chat-bar-container {
+    width: 250px;
+}
+
+.chat-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1.5px solid var(--card-border);
+    padding: 6px 12px;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    transition: all 0.25s ease;
+}
+
+.chat-prompt-icon {
+    font-size: 1.1rem;
+}
+
+#chat-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-color);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 500;
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+#chat-input::placeholder {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+/* Blinking Glow Focus Effect when typing */
+#chat-input:focus {
+    color: #ffffff;
+}
+
+.chat-input-wrapper:has(#chat-input:focus) {
+    border-color: var(--slot-active);
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+    animation: chatPulse 1.8s infinite alternate;
+}
+
+@keyframes chatPulse {
+    0% { border-color: rgba(56, 189, 248, 0.6); box-shadow: 0 0 10px rgba(56, 189, 248, 0.25); }
+    100% { border-color: rgba(56, 189, 248, 1); box-shadow: 0 0 20px rgba(56, 189, 248, 0.5); }
+}
+
+.chat-char-count {
+    font-family: var(--font-code);
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    font-weight: 700;
 }
 
 /* Bottom Right Hotbar & Inventory Toggle Button */
@@ -220,64 +350,6 @@ body {
     font-size: 0.65rem;
     color: var(--text-muted);
     font-weight: 700;
-}
-
-/* Bottom Left Inventory Window (3 cols x 2 rows) */
-.inventory-window {
-    position: absolute;
-    bottom: 1.5rem;
-    left: 1.5rem;
-    z-index: 30;
-    background: var(--card-bg);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid var(--card-border);
-    border-radius: 20px;
-    padding: 14px;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.inventory-window.hidden {
-    opacity: 0;
-    transform: translateY(20px);
-    pointer-events: none;
-}
-
-.inventory-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.inventory-title {
-    font-family: var(--font-heading);
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: var(--text-color);
-    letter-spacing: 0.5px;
-}
-
-.inventory-shortcut {
-    font-family: var(--font-code);
-    font-size: 0.68rem;
-    background: rgba(255, 255, 255, 0.08);
-    color: var(--text-muted);
-    padding: 2px 6px;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.inventory-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 58px);
-    grid-template-rows: repeat(2, 58px);
-    gap: 8px;
 }
 
 /* Item Slot (Hotbar & Inventory) */
