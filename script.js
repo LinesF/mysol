@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Adjustable Ambient Lighting (0.7 Brightness)
+// mysol 2D Pixel Game Engine - Fully Bright & Crystal Clear Ambient Lighting
 
 document.addEventListener('DOMContentLoaded', () => {
     // -------------------------------------------------------------
@@ -326,7 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // Adjusted Ambient Lighting Overlay (0.7 Brightness around character)
+    // Crystal Clear Ambient Lighting (100% Bright Center & Soft Ambient Vignette)
     // -------------------------------------------------------------
     function drawLightingOverlay() {
         const px = mapStartX + player.x;
@@ -335,34 +335,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const equippedItem = hotbar[activeHotbarIndex];
         const hasFlashlight = equippedItem && equippedItem.id === 'flashlight';
 
-        const tile3 = 3 * TILE_SIZE; // 192px (3 tiles)
-        const tile6 = 6 * TILE_SIZE; // 384px (6 tiles)
-
         ctx.save();
 
         if (hasFlashlight) {
-            // Flashlight Equipped: Very clear and bright illumination
-            const outerR = tile6 * 1.6; // ~614px
-
-            const grad = ctx.createRadialGradient(px, py, 20, px, py, outerR);
-            grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-            grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.1)'); // 90% Brightness
-            grad.addColorStop(0.85, 'rgba(0, 0, 0, 0.45)');
-            grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.85)');
+            // Flashlight Equipped: Warm Golden Light Aura illuminating the map
+            const grad = ctx.createRadialGradient(px, py, 10, px, py, 450);
+            grad.addColorStop(0, 'rgba(255, 235, 150, 0.35)'); // Golden light aura around player
+            grad.addColorStop(0.35, 'rgba(255, 255, 255, 0.1)');
+            grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.35)');
 
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, width, height);
         } else {
             // Standard Ambient Light:
-            // 3 tiles radius: ~0.7 Brightness (only 30% darkness opacity)
-            // Distance 3~6 tiles: Gradually darkens to outer edge
-            const outerR = tile6; // 384px
+            // 100% Fully Clear & Bright around player and 5x5 tile map!
+            // Extremely subtle dark vignette only at the far edges of the screen
+            const maxR = Math.max(width, height) * 0.7;
 
-            const grad = ctx.createRadialGradient(px, py, 15, px, py, outerR);
-            grad.addColorStop(0, 'rgba(0, 0, 0, 0.1)');     // Center: 90% bright
-            grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.3)');   // 3 tiles: 0.7 Brightness (30% dark)
-            grad.addColorStop(0.85, 'rgba(0, 0, 0, 0.75)'); // Distance 4~5 tiles: gradual darkening
-            grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.95)');  // 6+ tiles: dark edge
+            const grad = ctx.createRadialGradient(px, py, 200, px, py, maxR);
+            grad.addColorStop(0, 'rgba(0, 0, 0, 0)');        // 100% CRYSTAL CLEAR center
+            grad.addColorStop(0.4, 'rgba(0, 0, 0, 0.05)');   // 95% Clear across tilemap
+            grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.4)');    // Soft atmospheric dark edge vignette
 
             ctx.fillStyle = grad;
             ctx.fillRect(0, 0, width, height);
