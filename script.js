@@ -1,12 +1,21 @@
-// mysol 2D Pixel Game Engine - Step 3: Hotbar, Inventory, and Character Speech Bubble Chat
+// mysol 2D Pixel Game Engine - Fixed Keyboard & Chat Input Execution Order
 
 document.addEventListener('DOMContentLoaded', () => {
     // -------------------------------------------------------------
-    // 1. CANVAS & 2D PIXEL GAME ENGINE
+    // 1. ALL DOM ELEMENTS (DECLARED AT TOP TO PREVENT REFERENCE ERRORS)
     // -------------------------------------------------------------
     const canvas = document.getElementById('game-canvas');
     const ctx = canvas.getContext('2d');
+    const chatInputEl = document.getElementById('chat-input');
+    const chatCharCountEl = document.getElementById('chat-char-count');
+    const hotbarGridEl = document.getElementById('hotbar-grid');
+    const inventoryGridEl = document.getElementById('inventory-grid');
+    const inventoryWindowEl = document.getElementById('inventory-window');
+    const btnToggleInventoryEl = document.getElementById('btn-toggle-inventory');
 
+    // -------------------------------------------------------------
+    // 2. CANVAS & 2D PIXEL GAME ENGINE
+    // -------------------------------------------------------------
     let width = (canvas.width = window.innerWidth);
     let height = (canvas.height = window.innerHeight);
 
@@ -42,37 +51,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Active Speech Bubble State
     // Duration rules: 1~10 chars -> 4.5s, 11~15 chars -> 6s, 16~20 chars -> 7.5s
-    let activeSpeechBubble = null; // { text, totalDuration, remainingTime }
+    let activeSpeechBubble = null;
 
     const keys = {};
 
+    // Keyboard Event Listener
     window.addEventListener('keydown', (e) => {
-        const key = e.key.toLowerCase();
-
-        // Handle Enter Key for Chat Input
+        // 1. Enter Key for Chat Input
         if (e.key === 'Enter') {
             e.preventDefault();
             handleChatEnterKey();
             return;
         }
 
-        // Disable player movement / shortcut keys if typing in chat
+        // 2. Disable movement and shortcuts if user is typing in chat input
         if (document.activeElement === chatInputEl) {
             return;
         }
 
-        // Prevent Tab key default focus navigation
+        // 3. Tab Key for Inventory Toggle
         if (e.key === 'Tab') {
             e.preventDefault();
             toggleInventory();
             return;
         }
 
-        // Hotbar Key Select (1, 2, 3)
+        // 4. Hotbar Number Keys (1, 2, 3)
         if (e.key === '1') setEquippedSlot(0);
         if (e.key === '2') setEquippedSlot(1);
         if (e.key === '3') setEquippedSlot(2);
 
+        const key = e.key.toLowerCase();
         keys[key] = true;
         keys[e.key] = true;
     });
@@ -85,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function update() {
-        // Stop character movement if typing in chat
+        // Stop movement if typing in chat
         if (document.activeElement === chatInputEl) {
             player.isMoving = false;
             player.animFrame = 0;
@@ -140,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Update Speech Bubble Timer
         if (activeSpeechBubble) {
-            activeSpeechBubble.remainingTime -= 1 / 60; // 60 FPS
+            activeSpeechBubble.remainingTime -= 1 / 60;
             if (activeSpeechBubble.remainingTime <= 0) {
                 activeSpeechBubble = null;
             }
@@ -247,7 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Draw Retro Speech Bubble Above Character Head
     function drawSpeechBubble(bubble) {
         const px = player.x;
-        const py = player.y - 34; // Directly above character cap
+        const py = player.y - 34;
 
         ctx.save();
         ctx.font = "600 0.8rem 'Inter', sans-serif";
@@ -261,7 +270,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const bx = px - bubbleW / 2;
         const by = py - bubbleH - 8;
 
-        // Smooth fade out during final 0.5 seconds
         let alpha = 1.0;
         if (bubble.remainingTime < 0.5) {
             alpha = bubble.remainingTime / 0.5;
@@ -274,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.roundRect(bx + 2, by + 2, bubbleW, bubbleH, 10);
         ctx.fill();
 
-        // Bubble Fill (Dark Glass / Retro Card)
+        // Bubble Fill
         ctx.fillStyle = '#0f172a';
         ctx.beginPath();
         ctx.roundRect(bx, by, bubbleW, bubbleH, 10);
@@ -308,12 +316,8 @@ document.addEventListener('DOMContentLoaded', () => {
     render();
 
     // -------------------------------------------------------------
-    // 2. CHAT INPUT & SPEECH BUBBLE LOGIC
+    // 3. CHAT INPUT & SPEECH BUBBLE LOGIC
     // -------------------------------------------------------------
-    const chatInputEl = document.getElementById('chat-input');
-    const chatCharCountEl = document.getElementById('chat-char-count');
-
-    // Update character count indicator (0/20)
     chatInputEl.addEventListener('input', () => {
         if (chatInputEl.value.length > 20) {
             chatInputEl.value = chatInputEl.value.slice(0, 20);
@@ -329,7 +333,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // Already in chat input -> Submit message if not empty
             const text = chatInputEl.value.trim();
             if (text.length > 0) {
-                // Calculate display duration: <=10: 4.5s, <=15: 6.0s, <=20: 7.5s
                 let duration = 4.5;
                 if (text.length > 15) {
                     duration = 7.5;
@@ -351,7 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // 3. HOTBAR & INVENTORY SYSTEM
+    // 4. HOTBAR & INVENTORY SYSTEM
     // -------------------------------------------------------------
     const ITEMS = {
         HANDS: { id: 'hands', name: '맨손', icon: '✊' },
@@ -368,11 +371,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let inventory = [null, null, null, null, null, null];
     let activeHotbarIndex = 0;
     let dragSource = null;
-
-    const hotbarGridEl = document.getElementById('hotbar-grid');
-    const inventoryGridEl = document.getElementById('inventory-grid');
-    const inventoryWindowEl = document.getElementById('inventory-window');
-    const btnToggleInventoryEl = document.getElementById('btn-toggle-inventory');
 
     btnToggleInventoryEl.addEventListener('click', () => {
         toggleInventory();
