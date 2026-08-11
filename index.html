@@ -12,19 +12,38 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Top-Left Profile Header -->
+    <!-- Top-Left Character Profile & Status Bars -->
     <header class="top-header">
-        <div class="profile-group">
-            <a href="https://github.com/LinesF" target="_blank" rel="noopener noreferrer" class="profile-link" title="LinesF GitHub 프로필">
-                <img src="https://github.com/LinesF.png" alt="LinesF Avatar" class="profile-img" onerror="this.src='https://api.dicebear.com/7.x/identicon/svg?seed=LinesF'">
-                <span class="profile-name">LinesF</span>
-            </a>
-            <a href="https://github.com/LinesF/mysol" target="_blank" rel="noopener noreferrer" class="github-btn" title="mysol GitHub 저장소 바로가기">
-                <svg class="github-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
-                </svg>
-                <span>GitHub</span>
-            </a>
+        <div class="player-hud">
+            <div class="player-avatar-container">
+                <img src="https://github.com/LinesF.png" alt="Player Portrait" class="player-avatar-img" onerror="this.src='https://api.dicebear.com/7.x/identicon/svg?seed=LinesF'">
+            </div>
+            <div class="status-bars-container">
+                <!-- 1. Red Bar: Health (100) -->
+                <div class="status-bar-row health-row">
+                    <span class="bar-label">HP</span>
+                    <div class="bar-track">
+                        <div class="bar-fill red-fill" style="width: 100%;"></div>
+                        <span class="bar-value">100</span>
+                    </div>
+                </div>
+                <!-- 2. Yellow Bar: Energy/Stamina (50) -->
+                <div class="status-bar-row energy-row">
+                    <span class="bar-label">ENG</span>
+                    <div class="bar-track">
+                        <div class="bar-fill yellow-fill" style="width: 50%;"></div>
+                        <span class="bar-value">50</span>
+                    </div>
+                </div>
+                <!-- 3. Grey Bar: Equipment Utility (0) -->
+                <div class="status-bar-row equip-row">
+                    <span class="bar-label">EQUIP</span>
+                    <div class="bar-track">
+                        <div class="bar-fill grey-fill" style="width: 0%;"></div>
+                        <span class="bar-value">0</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </header>
 

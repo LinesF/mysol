@@ -34,7 +34,7 @@ body {
     -webkit-user-select: none;
 }
 
-/* Top-Left Profile Header */
+/* Top-Left Player HUD & Status Bars */
 .top-header {
     position: absolute;
     top: 1.25rem;
@@ -42,80 +42,113 @@ body {
     z-index: 20;
 }
 
-.profile-group {
+.player-hud {
     display: flex;
     align-items: center;
     gap: 12px;
     background: var(--card-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--card-border);
-    padding: 6px 14px 6px 6px;
-    border-radius: 30px;
+    padding: 10px 14px 10px 10px;
+    border-radius: 18px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
     transition: all 0.25s ease;
 }
 
-.profile-group:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.18);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+.player-hud:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 14px 35px rgba(0, 0, 0, 0.6);
 }
 
-.profile-link {
+.player-avatar-container {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    background: rgba(0, 0, 0, 0.4);
+    flex-shrink: 0;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.player-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Status Bars Container (Red, Yellow, Grey) */
+.status-bars-container {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 155px;
+}
+
+.status-bar-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    text-decoration: none;
-    color: var(--text-color);
+    gap: 8px;
 }
 
-.profile-img {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    transition: transform 0.25s ease;
-}
-
-.profile-link:hover .profile-img {
-    transform: scale(1.08);
-}
-
-.profile-name {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-color);
-    letter-spacing: -0.2px;
-}
-
-.github-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(255, 255, 255, 0.08);
+.bar-label {
+    font-family: var(--font-code);
+    font-size: 0.65rem;
+    font-weight: 700;
+    width: 36px;
+    text-align: right;
     color: var(--text-muted);
-    text-decoration: none;
-    padding: 5px 10px;
-    border-radius: 20px;
-    font-size: 0.78rem;
-    font-weight: 500;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    transition: all 0.25s ease;
+    letter-spacing: 0.5px;
 }
 
-.github-btn:hover {
-    color: var(--text-color);
-    background: rgba(255, 255, 255, 0.16);
-    border-color: rgba(255, 255, 255, 0.25);
+.bar-track {
+    flex: 1;
+    height: 14px;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
 }
 
-.github-icon {
-    transition: transform 0.25s ease;
+.bar-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width 0.3s ease;
 }
 
-.github-btn:hover .github-icon {
-    transform: rotate(12deg);
+/* Red Bar: Health (100) */
+.bar-fill.red-fill {
+    background: linear-gradient(90deg, #f43f5e, #e11d48);
+    box-shadow: 0 0 10px rgba(244, 63, 94, 0.4);
+}
+
+/* Yellow Bar: Energy / Skill Stamina (50) */
+.bar-fill.yellow-fill {
+    background: linear-gradient(90deg, #fbbf24, #d97706);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+}
+
+/* Grey Bar: Equipment Utility (0) */
+.bar-fill.grey-fill {
+    background: linear-gradient(90deg, #64748b, #475569);
+    box-shadow: 0 0 8px rgba(100, 116, 139, 0.3);
+}
+
+.bar-value {
+    position: absolute;
+    right: 6px;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    font-family: var(--font-code);
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #ffffff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
 /* Canvas Container */
