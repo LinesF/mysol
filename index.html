@@ -35,12 +35,12 @@
                         <span class="bar-value">50</span>
                     </div>
                 </div>
-                <!-- 3. Grey Bar: Equipment Utility (0) -->
-                <div class="status-bar-row equip-row">
-                    <span class="bar-label">EQUIP</span>
+                <!-- 3. Grey Bar: Flashlight Battery Utility (100/100) -->
+                <div class="status-bar-row equip-row" title="후레쉬 배터리 (F키 / 우클릭 ON/OFF, R키 충전)">
+                    <span class="bar-label">BAT</span>
                     <div class="bar-track">
-                        <div class="bar-fill grey-fill" style="width: 0%;"></div>
-                        <span class="bar-value">0</span>
+                        <div id="battery-bar-fill" class="bar-fill grey-fill" style="width: 100%;"></div>
+                        <span id="battery-bar-val" class="bar-value">100</span>
                     </div>
                 </div>
             </div>
@@ -57,7 +57,11 @@
         <canvas id="game-canvas" width="800" height="600"></canvas>
     </main>
 
-    <!-- Camera Distance Limit Warning Toast Banner -->
+    <!-- Flashlight Controls Guidance Banner & Camera Limit Warning Toast Banner -->
+    <div id="flashlight-toast" class="flashlight-toast hidden">
+        <span>🔦 후레쉬 ON (F / 마우스 우클릭 | R키로 충전)</span>
+    </div>
+
     <div id="camera-warning-toast" class="camera-warning-toast hidden">
         <span>⚠️ 카메라 이동 최대 거리에 도달했습니다 (최대 10칸)</span>
     </div>

@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 9: Fixed Bare Hands (Slot 1) & Inventory-Gated Quick Move
+// mysol 2D Pixel Game Engine - Step 10: Reduced Player Ambient Light, Flashlight Sector Beam (F/Right-Click), 1-Min Battery Discharge & R Key Recharge
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnToggleInventoryEl = document.getElementById('btn-toggle-inventory');
     const camLockBadgeEl = document.getElementById('cam-lock-badge');
     const cameraWarningToastEl = document.getElementById('camera-warning-toast');
+    const flashlightToastEl = document.getElementById('flashlight-toast');
+    const batteryBarFillEl = document.getElementById('battery-bar-fill');
+    const batteryBarValEl = document.getElementById('battery-bar-val');
 
     function safeRoundRect(x, y, w, h, r) {
         try {
@@ -42,6 +45,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const GRID_SIZE = 10; // 10x10 Grid
     const TILE_SIZE = 80;  // 80x80 Pixel Tiles
     const MAP_DIM = GRID_SIZE * TILE_SIZE; // 800x800 Total Map Size
+
+    // Mouse Tracking for Flashlight Direction
+    let mouseX = width / 2;
+    let mouseY = height / 2;
+
+    window.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouseX = e.clientX - rect.left;
+        mouseY = e.clientY - rect.top;
+    });
 
     function resizeCanvas() {
         width = canvas.width = maskCanvas.width = window.innerWidth || document.documentElement.clientWidth || 800;
@@ -74,10 +87,25 @@ document.addEventListener('DOMContentLoaded', () => {
     let isCameraLocked = true;
     const cameraPanOffset = { x: 0, y: 0 };
     const MAX_CAM_PAN_TILES = 10;
-    const MAX_CAM_PAN = MAX_CAM_PAN_TILES * TILE_SIZE; // 800px Max Camera Pan
+    const MAX_CAM_PAN = MAX_CAM_PAN_TILES * TILE_SIZE;
     const CAM_PAN_SPEED = 7.0;
 
+    // Flashlight & Battery System (100 Battery = 60 Seconds / 1 Min Discharge)
+    let isFlashlightOn = false;
+    let battery = 100.0; // 100 / 100 Max Battery
+    let flashlightToastTimeout = null;
     let warningToastTimeout = null;
+
+    function showFlashlightToast(text) {
+        if (!flashlightToastEl) return;
+        const span = flashlightToastEl.querySelector('span');
+        if (span) span.textContent = text;
+        flashlightToastEl.classList.remove('hidden');
+        if (flashlightToastTimeout) clearTimeout(flashlightToastTimeout);
+        flashlightToastTimeout = setTimeout(() => {
+            flashlightToastEl.classList.add('hidden');
+        }, 2000);
+    }
 
     function showCameraWarningToast() {
         if (!cameraWarningToastEl) return;
@@ -128,6 +156,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function toggleFlashlight() {
+        const equipped = hotbar[activeHotbarIndex];
+        if (!equipped || equipped.id !== 'flashlight') return;
+
+        if (battery <= 0) {
+            showFlashlightToast('⚠️ 배터리 부족! (R키를 꾹 눌러 충전하세요)');
+            isFlashlightOn = false;
+            return;
+        }
+
+        isFlashlightOn = !isFlashlightOn;
+        showFlashlightToast(isFlashlightOn ? '🔦 후레쉬 ON' : '🔦 후레쉬 OFF');
+    }
+
+    // Right Click Event for Flashlight Toggle
+    window.addEventListener('contextmenu', (e) => {
+        const equipped = hotbar[activeHotbarIndex];
+        if (equipped && equipped.id === 'flashlight') {
+            e.preventDefault();
+            toggleFlashlight();
+        }
+    });
+
     window.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -136,6 +187,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (chatInputEl && document.activeElement === chatInputEl) {
+            return;
+        }
+
+        // Toggle Flashlight with F key
+        if (e.key === 'f' || e.key === 'F') {
+            e.preventDefault();
+            toggleFlashlight();
             return;
         }
 
@@ -194,6 +252,41 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // -------------------------------------------------------------
+        // FLASHLIGHT BATTERY DISCHARGE & RECHARGE LOGIC
+        // -------------------------------------------------------------
+        const isRecharging = keys['r'] || keys['R'];
+
+        if (isRecharging) {
+            // Recharge Battery continuously while holding R key (~3 sec for full 100%)
+            battery += (100 / 3) * (1 / 60);
+            if (battery > 100) battery = 100;
+            if (batteryBarFillEl) batteryBarFillEl.classList.add('recharging');
+        } else {
+            if (batteryBarFillEl) batteryBarFillEl.classList.remove('recharging');
+        }
+
+        if (isFlashlightOn) {
+            // Drain battery continuously: 100% over 60 seconds (1 minute)
+            const drainPerFrame = (100 / 60) * (1 / 60);
+            battery -= drainPerFrame;
+
+            if (battery <= 0) {
+                battery = 0;
+                isFlashlightOn = false;
+                showFlashlightToast('⚠️ 배터리 방전! 후레쉬가 꺼졌습니다.');
+            }
+        }
+
+        // Update Battery HUD Bar in Realtime
+        if (batteryBarFillEl) {
+            batteryBarFillEl.style.width = `${Math.max(0, Math.min(100, battery))}%`;
+        }
+        if (batteryBarValEl) {
+            batteryBarValEl.textContent = Math.round(battery);
+        }
+
+        // WASD Movement Keys
         let isWASD = false;
         let dx = 0;
         let dy = 0;
@@ -293,7 +386,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             ctx.restore();
 
+            // Draw Dynamic Ambient Lighting Mask (Reduced player light + 3-tile Flashlight Cone)
             drawLightingOverlay(mapRenderX, mapRenderY);
+
             drawOffScreenCharacterArrow(mapRenderX, mapRenderY);
 
             update();
@@ -487,6 +582,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.restore();
     }
 
+    // -------------------------------------------------------------
+    // DYNAMIC AMBIENT LIGHTING & 3-TILE FLASHLIGHT SECTOR CONE
+    // Reduced base player ambient light (1.8 tiles) + 3-tile Flashlight Cone
+    // -------------------------------------------------------------
     function drawLightingOverlay(mapRenderX, mapRenderY) {
         try {
             if (!maskCtx) return;
@@ -497,29 +596,34 @@ document.addEventListener('DOMContentLoaded', () => {
             const cx = mapRenderX + campfire.x;
             const cy = mapRenderY + campfire.y;
 
-            const tile6 = 6 * TILE_SIZE; // 480px
+            // Reduced player base ambient light: 1.8 tiles radius (144px)
+            const playerBaseRadius = 1.8 * TILE_SIZE; // 144px
+            const campfireBaseRadius = 5.5 * TILE_SIZE; // 440px
             const flickerRadius = Math.sin(campfire.flickerTimer * 1.5) * 6;
-            const campfireLightRadius = tile6 + flickerRadius;
+            const campfireLightRadius = campfireBaseRadius + flickerRadius;
 
+            // 1. Clear offscreen mask canvas
             maskCtx.clearRect(0, 0, width, height);
-            maskCtx.fillStyle = 'rgba(11, 14, 23, 0.94)';
+
+            // 2. Fill offscreen mask canvas with deep ambient darkness (96% darkness)
+            maskCtx.fillStyle = 'rgba(10, 14, 23, 0.96)';
             maskCtx.fillRect(0, 0, width, height);
 
+            // 3. Cut out light holes using destination-out
             maskCtx.globalCompositeOperation = 'destination-out';
 
-            // Light Source 1: Player Character
-            const playerGrad = maskCtx.createRadialGradient(px, py, 15, px, py, tile6);
-            playerGrad.addColorStop(0, 'rgba(0, 0, 0, 0.85)');
-            playerGrad.addColorStop(0.48, 'rgba(0, 0, 0, 0.45)');
-            playerGrad.addColorStop(0.85, 'rgba(0, 0, 0, 0.1)');
-            playerGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+            // --- Light Source 1: Reduced Player Base Ambient Light ---
+            const playerGrad = maskCtx.createRadialGradient(px, py, 10, px, py, playerBaseRadius);
+            playerGrad.addColorStop(0, 'rgba(0, 0, 0, 0.85)');    // Center: 85% light cutout
+            playerGrad.addColorStop(0.6, 'rgba(0, 0, 0, 0.35)');   // 1 tile: 35% cutout
+            playerGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');    // 1.8 tiles: 0% cutout (darkness)
 
             maskCtx.fillStyle = playerGrad;
             maskCtx.beginPath();
-            maskCtx.arc(px, py, tile6, 0, Math.PI * 2);
+            maskCtx.arc(px, py, playerBaseRadius, 0, Math.PI * 2);
             maskCtx.fill();
 
-            // Light Source 2: Center Campfire
+            // --- Light Source 2: Center Campfire ---
             const fireGrad = maskCtx.createRadialGradient(cx, cy, 15, cx, cy, campfireLightRadius);
             fireGrad.addColorStop(0, 'rgba(0, 0, 0, 0.92)');
             fireGrad.addColorStop(0.48, 'rgba(0, 0, 0, 0.5)');
@@ -531,9 +635,35 @@ document.addEventListener('DOMContentLoaded', () => {
             maskCtx.arc(cx, cy, campfireLightRadius, 0, Math.PI * 2);
             maskCtx.fill();
 
+            // --- Light Source 3: 3-Tile Flashlight Sector / Cone Beam (When ON) ---
+            const isFlashlightEquipped = hotbar[activeHotbarIndex] && hotbar[activeHotbarIndex].id === 'flashlight';
+            if (isFlashlightEquipped && isFlashlightOn && battery > 0) {
+                const flashDistance = 3 * TILE_SIZE; // 3 Tiles = 240px
+                const flashAngle = Math.atan2(mouseY - py, mouseX - px);
+                const halfCone = Math.PI / 6; // 30 deg each side = 60 deg cone
+
+                // Cut out flashlight cone on mask canvas
+                maskCtx.beginPath();
+                maskCtx.moveTo(px, py);
+                maskCtx.arc(px, py, flashDistance, flashAngle - halfCone, flashAngle + halfCone);
+                maskCtx.closePath();
+
+                const coneGrad = maskCtx.createRadialGradient(px, py, 15, px, py, flashDistance);
+                coneGrad.addColorStop(0, 'rgba(0, 0, 0, 0.98)');
+                coneGrad.addColorStop(0.65, 'rgba(0, 0, 0, 0.85)');
+                coneGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+
+                maskCtx.fillStyle = coneGrad;
+                maskCtx.fill();
+            }
+
+            // Reset mask composite mode
             maskCtx.globalCompositeOperation = 'source-over';
+
+            // Draw darkness mask onto main game canvas
             ctx.drawImage(maskCanvas, 0, 0);
 
+            // 4. Draw Warm Campfire & Flashlight Beam Glow on Main Canvas
             // Warm campfire glow
             ctx.save();
             const warmGlow = ctx.createRadialGradient(cx, cy, 10, cx, cy, 260 + flickerRadius);
@@ -545,6 +675,27 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.beginPath();
             ctx.arc(cx, cy, 260 + flickerRadius, 0, Math.PI * 2);
             ctx.fill();
+
+            // Flashlight Yellow Beam Visual Overlay
+            if (isFlashlightEquipped && isFlashlightOn && battery > 0) {
+                const flashDistance = 3 * TILE_SIZE;
+                const flashAngle = Math.atan2(mouseY - py, mouseX - px);
+                const halfCone = Math.PI / 6;
+
+                ctx.beginPath();
+                ctx.moveTo(px, py);
+                ctx.arc(px, py, flashDistance, flashAngle - halfCone, flashAngle + halfCone);
+                ctx.closePath();
+
+                const beamGlow = ctx.createRadialGradient(px, py, 10, px, py, flashDistance);
+                beamGlow.addColorStop(0, 'rgba(254, 240, 138, 0.45)');
+                beamGlow.addColorStop(0.6, 'rgba(253, 224, 71, 0.2)');
+                beamGlow.addColorStop(1.0, 'rgba(253, 224, 71, 0.0)');
+
+                ctx.fillStyle = beamGlow;
+                ctx.fill();
+            }
+
             ctx.restore();
 
         } catch (err) {
@@ -552,6 +703,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // -------------------------------------------------------------
+    // OFF-SCREEN CHARACTER TRACKER RED ARROW
+    // -------------------------------------------------------------
     function drawOffScreenCharacterArrow(mapRenderX, mapRenderY) {
         const px = mapRenderX + player.x;
         const py = mapRenderY + player.y;
@@ -648,10 +802,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // HOTBAR & INVENTORY SYSTEM (Bare Hands Fixed in Slot 1)
+    // HOTBAR & INVENTORY SYSTEM
     // -------------------------------------------------------------
     const ITEMS = {
-        HANDS: { id: 'hands', name: '맨손', icon: '✊', locked: true }, // Slot 1 Locked!
+        HANDS: { id: 'hands', name: '맨손', icon: '✊', locked: true },
         FLASHLIGHT: { id: 'flashlight', name: '후레쉬', icon: '🔦' },
         PHONE: { id: 'phone', name: '핸드폰', icon: '📱' }
     };
@@ -682,6 +836,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function setEquippedSlot(index) {
         if (index >= 0 && index < 3) {
             activeHotbarIndex = index;
+            // Turn off flashlight if player switches away from flashlight slot
+            if (hotbar[activeHotbarIndex]?.id !== 'flashlight') {
+                isFlashlightOn = false;
+            }
             renderHotbar();
         }
     }
@@ -701,7 +859,6 @@ document.addEventListener('DOMContentLoaded', () => {
             slotEl.appendChild(keyBadge);
 
             if (item) {
-                // If item is locked (Bare Hands), disable drag attribute
                 if (!item.locked) {
                     slotEl.setAttribute('draggable', 'true');
                 }
@@ -760,13 +917,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (container === 'hotbar') {
                 setEquippedSlot(index);
                 const item = hotbar[index];
-                // Quick move ONLY if Inventory Window is currently OPEN AND item is NOT locked!
                 if (isInventoryOpen && item && !item.locked) {
                     quickMoveItem('hotbar', index);
                 }
             } else if (container === 'inventory') {
                 const item = inventory[index];
-                // Quick move from inventory ONLY if Inventory Window is OPEN
                 if (isInventoryOpen && item && !item.locked) {
                     quickMoveItem('inventory', index);
                 }
@@ -775,7 +930,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         slotEl.addEventListener('dragstart', (e) => {
             const item = container === 'hotbar' ? hotbar[index] : inventory[index];
-            // Prevent dragging locked item (Bare Hands in Slot 1)
             if (!item || item.locked) {
                 e.preventDefault();
                 return;
@@ -792,7 +946,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         slotEl.addEventListener('dragover', (e) => {
-            // Prevent dragging over locked Slot 1 (Bare Hands)
             if (container === 'hotbar' && index === 0) return;
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
@@ -808,7 +961,6 @@ document.addEventListener('DOMContentLoaded', () => {
             slotEl.classList.remove('drag-over');
             if (!dragSource) return;
 
-            // Block dropping into or out of locked Slot 1 (Bare Hands)
             if (container === 'hotbar' && index === 0) return;
             if (dragSource.container === 'hotbar' && dragSource.index === 0) return;
 
@@ -819,7 +971,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function quickMoveItem(srcContainer, srcIndex) {
         if (srcContainer === 'hotbar') {
-            if (srcIndex === 0) return; // Slot 1 (Bare Hands) is locked!
+            if (srcIndex === 0) return;
             const item = hotbar[srcIndex];
             if (!item || item.locked) return;
 
@@ -827,13 +979,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (emptyInvIndex !== -1) {
                 inventory[emptyInvIndex] = item;
                 hotbar[srcIndex] = null;
+                if (activeHotbarIndex === srcIndex) {
+                    isFlashlightOn = false;
+                }
                 renderAllUI();
             }
         } else if (srcContainer === 'inventory') {
             const item = inventory[srcIndex];
             if (!item || item.locked) return;
 
-            // Find first empty slot in hotbar EXCEPT slot 0 (which is fixed with Bare Hands)
             const emptyHotbarIndex = hotbar.findIndex((slot, idx) => idx > 0 && slot === null);
             if (emptyHotbarIndex !== -1) {
                 hotbar[emptyHotbarIndex] = item;
