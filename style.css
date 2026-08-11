@@ -380,7 +380,7 @@ body {
     gap: 12px;
 }
 
-/* Smartphone Screen UI (19:9 Aspect Ratio Vertical Screen, Matched to Hotbar Width) */
+/* Smartphone Screen UI (19:9 Aspect Ratio Vertical Screen, Expanded Width) */
 .phone-screen-container {
     transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
     opacity: 1;
@@ -397,8 +397,8 @@ body {
 }
 
 .phone-frame {
-    width: 190px;  /* Matched width of 3 Hotbar slots grid */
-    height: 401px; /* 190 * (19 / 9) = 401px -> Exact 19:9 Ratio */
+    width: 220px;  /* Expanded bottom width to match hotbar container */
+    height: 464px; /* 220 * (19 / 9) = 464.4px -> Exact 19:9 Ratio */
     background: #0f172a;
     border: 3.5px solid #334155;
     border-radius: 28px;
@@ -415,7 +415,7 @@ body {
     top: 10px;
     left: 50%;
     transform: translateX(-50%);
-    width: 50px;
+    width: 55px;
     height: 8px;
     background: #000000;
     border-radius: 6px;
@@ -472,19 +472,19 @@ body {
 }
 
 .phone-icon-big {
-    font-size: 2.5rem;
+    font-size: 2.8rem;
 }
 
 .phone-title {
     font-family: var(--font-heading);
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     font-weight: 800;
     color: #0f172a;
     letter-spacing: 0.5px;
 }
 
 .phone-home-bar {
-    width: 50px;
+    width: 55px;
     height: 4px;
     background: #94a3b8;
     border-radius: 3px;
