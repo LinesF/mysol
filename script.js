@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 12: 20:9 Aspect Ratio Smartphone UI Triggered by Phone Hotbar Equip
+// mysol 2D Pixel Game Engine - Step 13: Bare Hands Normal Attack (F/Right Click) & 2-Second Charged AoE Attack with Hotbar Slot 1 Fill Overlay
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -43,11 +43,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let width = 800;
     let height = 600;
 
-    const GRID_SIZE = 10; // 10x10 Grid
-    const TILE_SIZE = 80;  // 80x80 Pixel Tiles
-    const MAP_DIM = GRID_SIZE * TILE_SIZE; // 800x800 Total Map Size
+    const GRID_SIZE = 10;
+    const TILE_SIZE = 80;
+    const MAP_DIM = GRID_SIZE * TILE_SIZE;
 
-    // Mouse Tracking for Flashlight Direction
+    // Mouse Tracking
     let mouseX = width / 2;
     let mouseY = height / 2;
 
@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Player position in 10x10 world coordinates
+    // Player Position
     const player = {
         x: MAP_DIM / 2,
         y: MAP_DIM / 2 + 80,
@@ -77,14 +77,14 @@ document.addEventListener('DOMContentLoaded', () => {
         animTimer: 0
     };
 
-    // Campfire position at center of 10x10 map
+    // Campfire Position
     const campfire = {
         x: MAP_DIM / 2,
         y: MAP_DIM / 2,
         flickerTimer: 0
     };
 
-    // Camera & Viewport Management
+    // Camera Management
     let isCameraLocked = true;
     const cameraPanOffset = { x: 0, y: 0 };
     const MAX_CAM_PAN_TILES = 10;
@@ -96,6 +96,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let battery = 100.0;
     let flashlightToastTimeout = null;
     let warningToastTimeout = null;
+
+    // Bare Hands Combat System (Normal vs 2-Second Heavy Charge Attack)
+    let isBareHandsCharging = false;
+    let chargeHoldTimer = 0.0; // Seconds held (0.0s to 2.0s+)
+    let activeAttackAnimation = null; // { type: 'normal' | 'charged', angle: number, duration: number, remainingTime: number }
 
     function showFlashlightToast(text) {
         if (!flashlightToastEl) return;
@@ -155,6 +160,9 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let k in keys) {
             keys[k] = false;
         }
+        if (isBareHandsCharging) {
+            releaseBareHandsAttack();
+        }
     }
 
     function toggleFlashlight() {
@@ -171,11 +179,71 @@ document.addEventListener('DOMContentLoaded', () => {
         showFlashlightToast(isFlashlightOn ? '🔦 후레쉬 ON' : '🔦 후레쉬 OFF');
     }
 
+    // -------------------------------------------------------------
+    // BARE HANDS ATTACK & CHARGE LOGIC (F / RIGHT CLICK)
+    // -------------------------------------------------------------
+    function startBareHandsCharge() {
+        const equipped = hotbar[activeHotbarIndex];
+        if (!equipped || equipped.id !== 'hands') return;
+
+        isBareHandsCharging = true;
+        chargeHoldTimer = 0.0;
+    }
+
+    function releaseBareHandsAttack() {
+        if (!isBareHandsCharging) return;
+
+        const screenCenterX = width / 2;
+        const screenCenterY = height / 2;
+        const attackAngle = Math.atan2(mouseY - screenCenterY, mouseX - screenCenterX);
+
+        if (chargeHoldTimer >= 2.0) {
+            // Charged AoE Sector Attack!
+            activeAttackAnimation = {
+                type: 'charged',
+                angle: attackAngle,
+                totalDuration: 0.35,
+                remainingTime: 0.35
+            };
+        } else {
+            // Normal Front Melee Attack!
+            activeAttackAnimation = {
+                type: 'normal',
+                angle: attackAngle,
+                totalDuration: 0.22,
+                remainingTime: 0.22
+            };
+        }
+
+        isBareHandsCharging = false;
+        chargeHoldTimer = 0.0;
+        updateSlot1ChargeOverlay();
+    }
+
+    // Mouse Right Click Event Handlers
     window.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
         const equipped = hotbar[activeHotbarIndex];
         if (equipped && equipped.id === 'flashlight') {
-            e.preventDefault();
             toggleFlashlight();
+        }
+    });
+
+    window.addEventListener('mousedown', (e) => {
+        if (e.button === 2) { // Mouse Right Click
+            if (chatInputEl && document.activeElement === chatInputEl) return;
+            const equipped = hotbar[activeHotbarIndex];
+            if (equipped && equipped.id === 'hands') {
+                startBareHandsCharge();
+            }
+        }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+        if (e.button === 2) { // Mouse Right Click Release
+            if (isBareHandsCharging) {
+                releaseBareHandsAttack();
+            }
         }
     });
 
@@ -190,9 +258,15 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // F key trigger
         if (e.key === 'f' || e.key === 'F') {
             e.preventDefault();
-            toggleFlashlight();
+            const equipped = hotbar[activeHotbarIndex];
+            if (equipped && equipped.id === 'flashlight') {
+                toggleFlashlight();
+            } else if (equipped && equipped.id === 'hands' && !isBareHandsCharging) {
+                startBareHandsCharge();
+            }
             return;
         }
 
@@ -229,6 +303,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.addEventListener('keyup', (e) => {
+        if ((e.key === 'f' || e.key === 'F') && isBareHandsCharging) {
+            releaseBareHandsAttack();
+        }
+
         const key = e.key.toLowerCase();
         keys[key] = false;
         keys[e.key] = false;
@@ -237,6 +315,32 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('blur', resetKeys);
     if (chatInputEl) {
         chatInputEl.addEventListener('focus', resetKeys);
+    }
+
+    function updateSlot1ChargeOverlay() {
+        if (!hotbarGridEl) return;
+        const slot1El = hotbarGridEl.children[0];
+        if (!slot1El) return;
+
+        let overlayEl = slot1El.querySelector('.slot-charge-overlay');
+        if (!overlayEl) {
+            overlayEl = document.createElement('div');
+            overlayEl.className = 'slot-charge-overlay';
+            slot1El.appendChild(overlayEl);
+        }
+
+        if (isBareHandsCharging) {
+            const pct = Math.min(100, (chargeHoldTimer / 2.0) * 100);
+            overlayEl.style.height = `${pct}%`;
+            if (pct >= 100) {
+                overlayEl.classList.add('charged-ready');
+            } else {
+                overlayEl.classList.remove('charged-ready');
+            }
+        } else {
+            overlayEl.style.height = '0%';
+            overlayEl.classList.remove('charged-ready');
+        }
     }
 
     function update() {
@@ -249,6 +353,20 @@ document.addEventListener('DOMContentLoaded', () => {
             player.animTimer = 0;
             resetKeys();
             return;
+        }
+
+        // Charge Timer Update
+        if (isBareHandsCharging) {
+            chargeHoldTimer += 1 / 60;
+            updateSlot1ChargeOverlay();
+        }
+
+        // Active Attack Animation Timer
+        if (activeAttackAnimation) {
+            activeAttackAnimation.remainingTime -= 1 / 60;
+            if (activeAttackAnimation.remainingTime <= 0) {
+                activeAttackAnimation = null;
+            }
         }
 
         // Flashlight Battery Recharge & Discharge
@@ -373,6 +491,11 @@ document.addEventListener('DOMContentLoaded', () => {
             drawGrassTilemap();
             drawCampfire();
             drawPlayerCharacter();
+
+            // Draw Bare Hands White Attack Range Effect
+            if (activeAttackAnimation) {
+                drawAttackRangeIndicator(activeAttackAnimation);
+            }
 
             if (activeSpeechBubble) {
                 drawSpeechBubble(activeSpeechBubble);
@@ -521,6 +644,64 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.restore();
     }
 
+    // -------------------------------------------------------------
+    // WHITE ATTACK RANGE INDICATOR (Normal Arc vs Charged AoE Sector)
+    // -------------------------------------------------------------
+    function drawAttackRangeIndicator(attack) {
+        const px = player.x;
+        const py = player.y;
+
+        ctx.save();
+        ctx.translate(px, py);
+
+        const progress = attack.remainingTime / attack.totalDuration;
+        const alpha = Math.sin(progress * Math.PI); // Smooth fade in/out
+
+        if (attack.type === 'normal') {
+            // Normal Attack: Crisp Front Melee Arc (75px radius, 70 deg arc)
+            const radius = 75;
+            const halfArc = Math.PI / 5;
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, radius, attack.angle - halfArc, attack.angle + halfArc);
+            ctx.closePath();
+
+            ctx.fillStyle = `rgba(255, 255, 255, ${0.45 * alpha})`;
+            ctx.fill();
+
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * alpha})`;
+            ctx.lineWidth = 3.5;
+            ctx.stroke();
+
+        } else if (attack.type === 'charged') {
+            // Charged AoE Heavy Attack: Large White Sector Cone (145px radius, 120 deg arc)
+            const radius = 145;
+            const halfArc = Math.PI / 3;
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.arc(0, 0, radius, attack.angle - halfArc, attack.angle + halfArc);
+            ctx.closePath();
+
+            const coneGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, radius);
+            coneGrad.addColorStop(0, `rgba(255, 255, 255, ${0.85 * alpha})`);
+            coneGrad.addColorStop(0.6, `rgba(255, 255, 255, ${0.45 * alpha})`);
+            coneGrad.addColorStop(1.0, `rgba(255, 255, 255, ${0.1 * alpha})`);
+
+            ctx.fillStyle = coneGrad;
+            ctx.fill();
+
+            ctx.strokeStyle = `rgba(255, 255, 255, ${1.0 * alpha})`;
+            ctx.lineWidth = 4;
+            ctx.shadowColor = 'rgba(255, 255, 255, 0.9)';
+            ctx.shadowBlur = 12;
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
     function drawSpeechBubble(bubble) {
         const px = player.x;
         const py = player.y - 38;
@@ -602,7 +783,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             maskCtx.globalCompositeOperation = 'destination-out';
 
-            // Light Source 1: Player Ambient Light
+            // Light Source 1: Player Base Ambient Light
             const playerGrad = maskCtx.createRadialGradient(px, py, 10, px, py, playerBaseRadius);
             playerGrad.addColorStop(0, 'rgba(0, 0, 0, 0.85)');
             playerGrad.addColorStop(0.6, 'rgba(0, 0, 0, 0.35)');
@@ -625,7 +806,7 @@ document.addEventListener('DOMContentLoaded', () => {
             maskCtx.arc(cx, cy, campfireLightRadius, 0, Math.PI * 2);
             maskCtx.fill();
 
-            // Light Source 3: 6-Tile Softened Flashlight Sector / Cone Beam
+            // Light Source 3: 6-Tile Softened Flashlight Sector Beam
             if (isFlashlightActive) {
                 const flashDistance = 6 * TILE_SIZE;
                 const flashAngle = Math.atan2(mouseY - py, mouseX - px);
@@ -822,6 +1003,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (hotbar[activeHotbarIndex]?.id !== 'flashlight') {
                 isFlashlightOn = false;
             }
+            if (hotbar[activeHotbarIndex]?.id !== 'hands') {
+                isBareHandsCharging = false;
+                chargeHoldTimer = 0.0;
+            }
             renderAllUI();
         }
     }
@@ -859,6 +1044,8 @@ document.addEventListener('DOMContentLoaded', () => {
             attachSlotEvents(slotEl, 'hotbar', index);
             hotbarGridEl.appendChild(slotEl);
         });
+
+        updateSlot1ChargeOverlay();
     }
 
     function renderInventory() {

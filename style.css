@@ -397,8 +397,8 @@ body {
 }
 
 .phone-frame {
-    width: 260px;  /* Widened horizontal width */
-    height: 510px; /* Proportionate height */
+    width: 260px;
+    height: 510px;
     background: #0f172a;
     border: 3.5px solid #334155;
     border-radius: 28px;
@@ -425,7 +425,7 @@ body {
 .phone-screen-body {
     width: 100%;
     height: 100%;
-    background: #ffffff; /* Clean White Screen */
+    background: #ffffff;
     border-radius: 22px;
     overflow: hidden;
     display: flex;
@@ -552,6 +552,7 @@ body {
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    overflow: hidden;
 }
 
 .item-slot.locked-slot {
@@ -575,6 +576,30 @@ body {
     background: rgba(34, 197, 94, 0.25);
 }
 
+/* Hotbar Charge Overlay Fill Animation (Fills Bottom to Top) */
+.slot-charge-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 0%;
+    background: linear-gradient(0deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.4));
+    pointer-events: none;
+    z-index: 2;
+    transition: height 0.04s linear;
+}
+
+.slot-charge-overlay.charged-ready {
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 1);
+    animation: chargePulse 0.3s infinite alternate;
+}
+
+@keyframes chargePulse {
+    from { opacity: 0.7; }
+    to { opacity: 1; }
+}
+
 .slot-key-badge {
     position: absolute;
     top: 4px;
@@ -583,12 +608,14 @@ body {
     font-size: 0.65rem;
     font-weight: 700;
     color: var(--text-muted);
+    z-index: 5;
 }
 
 .item-icon {
     font-size: 1.5rem;
     line-height: 1;
     margin-bottom: 2px;
+    z-index: 5;
 }
 
 .item-name-tag {
@@ -599,4 +626,5 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 50px;
+    z-index: 5;
 }
