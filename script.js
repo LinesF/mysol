@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Fully Bright & Crystal Clear Ambient Lighting
+// mysol 2D Pixel Game Engine - Fully Bright Daylight Mode (No Dark Overlay, Larger 5x5 Map)
 
 document.addEventListener('DOMContentLoaded', () => {
     // -------------------------------------------------------------
@@ -13,21 +13,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const inventoryWindowEl = document.getElementById('inventory-window');
     const btnToggleInventoryEl = document.getElementById('btn-toggle-inventory');
 
+    // Safe Canvas RoundRect Polyfill to prevent rendering crashes on any browser
+    function safeRoundRect(x, y, w, h, r) {
+        if (typeof ctx.roundRect === 'function') {
+            ctx.roundRect(x, y, w, h, r);
+        } else {
+            ctx.rect(x, y, w, h);
+        }
+    }
+
     // -------------------------------------------------------------
     // 2. CANVAS & 2D PIXEL GAME ENGINE
     // -------------------------------------------------------------
-    let width = (canvas.width = window.innerWidth);
-    let height = (canvas.height = window.innerHeight);
+    let width = (canvas.width = window.innerWidth || 800);
+    let height = (canvas.height = window.innerHeight || 600);
 
     window.addEventListener('resize', () => {
-        width = canvas.width = window.innerWidth;
-        height = canvas.height = window.innerHeight;
+        width = canvas.width = window.innerWidth || 800;
+        height = canvas.height = window.innerHeight || 600;
         updateMapBounds();
     });
 
     const GRID_SIZE = 5;
-    const TILE_SIZE = 64;
-    const MAP_DIM = GRID_SIZE * TILE_SIZE; // 320x320 Pixels
+    const TILE_SIZE = 90; // 90x90 Pixel Tiles (450x450 Total Size - Large & Visible!)
+    const MAP_DIM = GRID_SIZE * TILE_SIZE; // 450x450 Pixels
 
     let mapStartX = 0;
     let mapStartY = 0;
@@ -41,18 +50,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const player = {
         x: MAP_DIM / 2,
         y: MAP_DIM / 2,
-        size: 32,
-        speed: 2.5,
+        size: 36,
+        speed: 3.2,
         direction: 'down',
         isMoving: false,
         animFrame: 0,
         animTimer: 0
     };
 
-    // Active Speech Bubble State
     let activeSpeechBubble = null;
-
-    // Movement Key Tracker
     const keys = {};
 
     function resetKeys() {
@@ -61,33 +67,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Keyboard Event Listener
     window.addEventListener('keydown', (e) => {
-        // 1. Enter Key for Chat Input
         if (e.key === 'Enter') {
             e.preventDefault();
             handleChatEnterKey();
             return;
         }
 
-        // 2. Disable movement and shortcuts if user is typing in chat input
         if (document.activeElement === chatInputEl) {
             return;
         }
 
-        // 3. Tab Key for Inventory Toggle
         if (e.key === 'Tab') {
             e.preventDefault();
             toggleInventory();
             return;
         }
 
-        // 4. Hotbar Number Keys (1, 2, 3)
         if (e.key === '1') setEquippedSlot(0);
         if (e.key === '2') setEquippedSlot(1);
         if (e.key === '3') setEquippedSlot(2);
 
-        // Disable movement if inventory is open
         if (!inventoryWindowEl.classList.contains('hidden')) {
             return;
         }
@@ -175,7 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.clearRect(0, 0, width, height);
         ctx.imageSmoothingEnabled = false;
 
-        // 1. Draw Map & Player (World Coordinates)
+        // Draw Map & Player (World Coordinates)
         ctx.save();
         ctx.translate(mapStartX, mapStartY);
 
@@ -188,102 +188,111 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ctx.restore();
 
-        // 2. Draw Lighting Overlay (Screen Coordinates)
-        drawLightingOverlay();
-
         update();
         requestAnimationFrame(render);
     }
 
+    // Draw 5x5 Vibrant Grass Tiles (90x90px each)
     function drawGrassTilemap() {
         for (let row = 0; row < GRID_SIZE; row++) {
             for (let col = 0; col < GRID_SIZE; col++) {
                 const tx = col * TILE_SIZE;
                 const ty = row * TILE_SIZE;
 
+                // Bright vibrant checkered green colors
                 const isEven = (row + col) % 2 === 0;
-                ctx.fillStyle = isEven ? '#22c55e' : '#16a34a';
+                ctx.fillStyle = isEven ? '#4ade80' : '#22c55e';
                 ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
 
-                ctx.fillStyle = '#15803d';
-                ctx.fillRect(tx + 12, ty + 16, 4, 8);
-                ctx.fillRect(tx + 8, ty + 20, 4, 4);
-                ctx.fillRect(tx + 40, ty + 36, 4, 8);
-                ctx.fillRect(tx + 44, ty + 32, 4, 4);
+                // Grass details
+                ctx.fillStyle = '#16a34a';
+                ctx.fillRect(tx + 16, ty + 24, 6, 12);
+                ctx.fillRect(tx + 10, ty + 30, 6, 6);
+                ctx.fillRect(tx + 56, ty + 50, 6, 12);
+                ctx.fillRect(tx + 62, ty + 44, 6, 6);
 
-                ctx.fillStyle = '#4ade80';
-                ctx.fillRect(tx + 16, ty + 12, 4, 4);
-                ctx.fillRect(tx + 36, ty + 40, 4, 4);
+                // Highlight tufts
+                ctx.fillStyle = '#86efac';
+                ctx.fillRect(tx + 22, ty + 18, 6, 6);
+                ctx.fillRect(tx + 50, ty + 56, 6, 6);
             }
         }
 
+        // Earth / Gold Outer Border
         ctx.strokeStyle = '#854d0e';
-        ctx.lineWidth = 6;
+        ctx.lineWidth = 8;
         ctx.strokeRect(0, 0, MAP_DIM, MAP_DIM);
 
-        ctx.strokeStyle = '#ca8a04';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(-3, -3, MAP_DIM + 6, MAP_DIM + 6);
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(-4, -4, MAP_DIM + 8, MAP_DIM + 8);
     }
 
+    // Draw Player Character
     function drawPlayerCharacter() {
         const px = player.x;
         const py = player.y;
 
-        const bounceY = (player.isMoving && (player.animFrame % 2 === 1)) ? -2 : 0;
+        const bounceY = (player.isMoving && (player.animFrame % 2 === 1)) ? -3 : 0;
 
         ctx.save();
         ctx.translate(px, py + bounceY);
 
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        // Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
         ctx.beginPath();
-        ctx.ellipse(0, 14, 14, 6, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 16, 16, 7, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        ctx.fillStyle = '#334155';
-        ctx.fillRect(-10, 8, 8, 6);
-        ctx.fillRect(2, 8, 8, 6);
+        // Boots
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(-12, 10, 10, 8);
+        ctx.fillRect(2, 10, 10, 8);
 
+        // Tunic / Body (Vibrant Blue)
         ctx.fillStyle = '#0284c7';
-        ctx.fillRect(-12, -6, 24, 15);
+        ctx.fillRect(-14, -6, 28, 18);
         ctx.fillStyle = '#38bdf8';
-        ctx.fillRect(-10, -6, 20, 4);
+        ctx.fillRect(-12, -6, 24, 5);
 
-        ctx.fillStyle = '#fde047';
-        ctx.fillRect(-14, -22, 28, 10);
+        // Hair (Gold)
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillRect(-16, -24, 32, 12);
 
+        // Face Skin
         ctx.fillStyle = '#fed7aa';
-        ctx.fillRect(-12, -14, 24, 10);
+        ctx.fillRect(-14, -14, 28, 12);
 
+        // Eyes
         ctx.fillStyle = '#0f172a';
         if (player.direction === 'down') {
-            ctx.fillRect(-6, -11, 4, 4);
-            ctx.fillRect(2, -11, 4, 4);
+            ctx.fillRect(-7, -11, 5, 5);
+            ctx.fillRect(2, -11, 5, 5);
         } else if (player.direction === 'up') {
             ctx.fillStyle = '#eab308';
-            ctx.fillRect(-12, -14, 24, 10);
+            ctx.fillRect(-14, -14, 28, 12);
         } else if (player.direction === 'left') {
-            ctx.fillRect(-8, -11, 4, 4);
+            ctx.fillRect(-10, -11, 5, 5);
         } else if (player.direction === 'right') {
-            ctx.fillRect(4, -11, 4, 4);
+            ctx.fillRect(5, -11, 5, 5);
         }
 
         ctx.restore();
     }
 
+    // Draw Speech Bubble
     function drawSpeechBubble(bubble) {
         const px = player.x;
-        const py = player.y - 34;
+        const py = player.y - 38;
 
         ctx.save();
-        ctx.font = "600 0.8rem 'Inter', sans-serif";
+        ctx.font = "600 0.85rem 'Inter', sans-serif";
 
         const textMetrics = ctx.measureText(bubble.text);
         const textWidth = textMetrics.width;
-        const paddingX = 12;
-        const paddingY = 6;
+        const paddingX = 14;
         const bubbleW = textWidth + paddingX * 2;
-        const bubbleH = 26;
+        const bubbleH = 28;
         const bx = px - bubbleW / 2;
         const by = py - bubbleH - 8;
 
@@ -295,12 +304,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
         ctx.beginPath();
-        ctx.roundRect(bx + 2, by + 2, bubbleW, bubbleH, 10);
+        safeRoundRect(bx + 2, by + 2, bubbleW, bubbleH, 10);
         ctx.fill();
 
         ctx.fillStyle = '#0f172a';
         ctx.beginPath();
-        ctx.roundRect(bx, by, bubbleW, bubbleH, 10);
+        safeRoundRect(bx, by, bubbleW, bubbleH, 10);
         ctx.fill();
 
         ctx.strokeStyle = '#38bdf8';
@@ -321,45 +330,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(bubble.text, px, by + bubbleH / 2);
-
-        ctx.restore();
-    }
-
-    // -------------------------------------------------------------
-    // Crystal Clear Ambient Lighting (100% Bright Center & Soft Ambient Vignette)
-    // -------------------------------------------------------------
-    function drawLightingOverlay() {
-        const px = mapStartX + player.x;
-        const py = mapStartY + player.y;
-
-        const equippedItem = hotbar[activeHotbarIndex];
-        const hasFlashlight = equippedItem && equippedItem.id === 'flashlight';
-
-        ctx.save();
-
-        if (hasFlashlight) {
-            // Flashlight Equipped: Warm Golden Light Aura illuminating the map
-            const grad = ctx.createRadialGradient(px, py, 10, px, py, 450);
-            grad.addColorStop(0, 'rgba(255, 235, 150, 0.35)'); // Golden light aura around player
-            grad.addColorStop(0.35, 'rgba(255, 255, 255, 0.1)');
-            grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.35)');
-
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, width, height);
-        } else {
-            // Standard Ambient Light:
-            // 100% Fully Clear & Bright around player and 5x5 tile map!
-            // Extremely subtle dark vignette only at the far edges of the screen
-            const maxR = Math.max(width, height) * 0.7;
-
-            const grad = ctx.createRadialGradient(px, py, 200, px, py, maxR);
-            grad.addColorStop(0, 'rgba(0, 0, 0, 0)');        // 100% CRYSTAL CLEAR center
-            grad.addColorStop(0.4, 'rgba(0, 0, 0, 0.05)');   // 95% Clear across tilemap
-            grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.4)');    // Soft atmospheric dark edge vignette
-
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, width, height);
-        }
 
         ctx.restore();
     }
