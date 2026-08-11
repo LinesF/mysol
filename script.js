@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 7: Camera Lock (Y Key), Manual Panning (Arrow Keys, 10 Tile Limit), Auto-Lock on Move, & Off-Screen Character Tracker Arrow
+// mysol 2D Pixel Game Engine - Center-Anchored Camera Scrolling & Auto-Unlock Arrow Key Panning
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -39,25 +39,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let width = 800;
     let height = 600;
 
-    const GRID_SIZE = 10;
-    const TILE_SIZE = 80; // 80x80 Pixel Tiles
+    const GRID_SIZE = 10; // 10x10 Grid
+    const TILE_SIZE = 80;  // 80x80 Pixel Tiles
     const MAP_DIM = GRID_SIZE * TILE_SIZE; // 800x800 Total Map Size
-
-    let mapStartX = 100;
-    let mapStartY = 100;
 
     function resizeCanvas() {
         width = canvas.width = maskCanvas.width = window.innerWidth || document.documentElement.clientWidth || 800;
         height = canvas.height = maskCanvas.height = window.innerHeight || document.documentElement.clientHeight || 600;
-        
-        mapStartX = Math.max(20, Math.floor((width - MAP_DIM) / 2));
-        mapStartY = Math.max(70, Math.floor((height - MAP_DIM) / 2));
     }
 
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Player position starts in center of 10x10 map
+    // Player position in 10x10 world coordinates (0 to 800)
     const player = {
         x: MAP_DIM / 2,
         y: MAP_DIM / 2 + 80,
@@ -69,19 +63,19 @@ document.addEventListener('DOMContentLoaded', () => {
         animTimer: 0
     };
 
-    // Campfire position at center of 10x10 map
+    // Campfire position at exact center of 10x10 map
     const campfire = {
         x: MAP_DIM / 2,
         y: MAP_DIM / 2,
         flickerTimer: 0
     };
 
-    // Camera State & Panning Limits
-    let isCameraLocked = true; // Default: locked on player
+    // Camera & Viewport Management
+    let isCameraLocked = true; // Default: Character stays centered on screen
     const cameraPanOffset = { x: 0, y: 0 };
     const MAX_CAM_PAN_TILES = 10;
-    const MAX_CAM_PAN = MAX_CAM_PAN_TILES * TILE_SIZE; // 800px Max Camera Pan Distance
-    const CAM_PAN_SPEED = 6.0;
+    const MAX_CAM_PAN = MAX_CAM_PAN_TILES * TILE_SIZE; // 800px Max Camera Pan
+    const CAM_PAN_SPEED = 7.0;
 
     let warningToastTimeout = null;
 
@@ -166,6 +160,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // If Arrow Key is pressed while WASD is NOT held, automatically UNLOCK camera for panning!
+        const isArrowKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key);
+        const isWASDPressed = keys['w'] || keys['s'] || keys['a'] || keys['d'];
+
+        if (isArrowKey && !isWASDPressed && isCameraLocked) {
+            toggleCameraLock(false);
+        }
+
         const key = e.key.toLowerCase();
         keys[key] = true;
         keys[e.key] = true;
@@ -194,7 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Check character movement inputs (WASD)
+        // WASD Movement Keys
         let isWASD = false;
         let dx = 0;
         let dy = 0;
@@ -204,12 +206,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (keys['a']) { dx -= 1; player.direction = 'left'; isWASD = true; }
         if (keys['d']) { dx += 1; player.direction = 'right'; isWASD = true; }
 
-        // If player moves character with WASD, automatically lock camera to character!
+        // If player starts moving character with WASD, AUTOMATICALLY RE-LOCK CAMERA to character!
         if (isWASD && !isCameraLocked) {
             toggleCameraLock(true);
         }
 
-        // Camera Panning with Arrow Keys (When Camera Lock is OFF)
+        // Camera Panning with Arrow Keys (When Camera Lock is OFF & WASD is not held)
         if (!isCameraLocked && !isWASD) {
             let panX = 0;
             let panY = 0;
@@ -274,18 +276,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function render() {
         try {
-            // Clear background with dark slate color
+            // Fill Canvas Background
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(0, 0, width, height);
             ctx.imageSmoothingEnabled = false;
 
-            // Compute Viewport Camera Offset
-            const camOffsetX = isCameraLocked ? 0 : cameraPanOffset.x;
-            const camOffsetY = isCameraLocked ? 0 : cameraPanOffset.y;
+            // Screen Center Point
+            const screenCenterX = width / 2;
+            const screenCenterY = height / 2;
 
-            // Draw World Elements on Main Canvas with Camera Translation
+            // Map Translation: Character is centered at (width/2, height/2), map scrolls around it!
+            const mapRenderX = isCameraLocked ? (screenCenterX - player.x) : (screenCenterX - player.x - cameraPanOffset.x);
+            const mapRenderY = isCameraLocked ? (screenCenterY - player.y) : (screenCenterY - player.y - cameraPanOffset.y);
+
+            // Draw World Elements on Main Canvas
             ctx.save();
-            ctx.translate(mapStartX - camOffsetX, mapStartY - camOffsetY);
+            ctx.translate(mapRenderX, mapRenderY);
 
             drawGrassTilemap();
             drawCampfire();
@@ -298,10 +304,10 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.restore();
 
             // Draw Dynamic Ambient Lighting Mask
-            drawLightingOverlay(camOffsetX, camOffsetY);
+            drawLightingOverlay(mapRenderX, mapRenderY);
 
             // Draw Red Arrow Indicator if Character is Off-Screen!
-            drawOffScreenCharacterArrow(camOffsetX, camOffsetY);
+            drawOffScreenCharacterArrow(mapRenderX, mapRenderY);
 
             update();
         } catch (err) {
@@ -343,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.strokeRect(-4, -4, MAP_DIM + 8, MAP_DIM + 8);
     }
 
-    // Draw Campfire
+    // Draw Campfire at center of 10x10 map
     function drawCampfire() {
         const cx = campfire.x;
         const cy = campfire.y;
@@ -499,17 +505,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // OFFSCREEN CANVAS LIGHTING OVERLAY ENGINE (Includes Cam Offset)
+    // OFFSCREEN CANVAS LIGHTING OVERLAY ENGINE
+    // Transforms light cutouts accurately based on Map Render Translation!
     // -------------------------------------------------------------
-    function drawLightingOverlay(camOffsetX, camOffsetY) {
+    function drawLightingOverlay(mapRenderX, mapRenderY) {
         try {
             if (!maskCtx) return;
 
-            const px = mapStartX + player.x - camOffsetX;
-            const py = mapStartY + player.y - camOffsetY;
+            const px = mapRenderX + player.x;
+            const py = mapRenderY + player.y;
 
-            const cx = mapStartX + campfire.x - camOffsetX;
-            const cy = mapStartY + campfire.y - camOffsetY;
+            const cx = mapRenderX + campfire.x;
+            const cy = mapRenderY + campfire.y;
 
             const tile6 = 6 * TILE_SIZE; // 480px
             const flickerRadius = Math.sin(campfire.flickerTimer * 1.5) * 6;
@@ -568,39 +575,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // -------------------------------------------------------------
     // OFF-SCREEN CHARACTER TRACKER RED ARROW
-    // Rendered at the edge of the viewport pointing towards off-screen player
     // -------------------------------------------------------------
-    function drawOffScreenCharacterArrow(camOffsetX, camOffsetY) {
-        const px = mapStartX + player.x - camOffsetX;
-        const py = mapStartY + player.y - camOffsetY;
+    function drawOffScreenCharacterArrow(mapRenderX, mapRenderY) {
+        const px = mapRenderX + player.x;
+        const py = mapRenderY + player.y;
 
         const margin = 45;
         const isOffScreen = (px < margin || px > width - margin || py < margin || py > height - margin);
 
         if (!isOffScreen) return;
 
-        // Calculate direction angle from screen center to character
         const centerX = width / 2;
         const centerY = height / 2;
         const dx = px - centerX;
         const dy = py - centerY;
         const angle = Math.atan2(dy, dx);
 
-        // Clamp arrow indicator near screen edge
         const edgeX = Math.max(margin, Math.min(width - margin, centerX + Math.cos(angle) * (width / 2 - margin)));
         const edgeY = Math.max(margin, Math.min(height - margin, centerY + Math.sin(angle) * (height / 2 - margin)));
 
         ctx.save();
         ctx.translate(edgeX, edgeY);
 
-        // Pulse effect
         const pulse = Math.sin(Date.now() * 0.008) * 3;
 
-        // Glow Shadow
         ctx.shadowColor = 'rgba(244, 63, 94, 0.8)';
         ctx.shadowBlur = 12;
 
-        // Red Pointer Arrow Body
         ctx.rotate(angle);
         ctx.fillStyle = '#f43f5e';
         ctx.beginPath();
@@ -615,11 +616,10 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Distance Tag
         const distPx = Math.hypot(dx, dy);
         const distTiles = Math.round(distPx / TILE_SIZE);
 
-        ctx.rotate(-angle); // Reset rotation for text
+        ctx.rotate(-angle);
         ctx.font = "700 0.75rem 'Fira Code', monospace";
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
