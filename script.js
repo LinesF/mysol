@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 11: 6-Tile Softened Flashlight Beam & +1 Tile Player Ambient Scatter
+// mysol 2D Pixel Game Engine - Step 12: 20:9 Aspect Ratio Smartphone UI Triggered by Phone Hotbar Equip
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const flashlightToastEl = document.getElementById('flashlight-toast');
     const batteryBarFillEl = document.getElementById('battery-bar-fill');
     const batteryBarValEl = document.getElementById('battery-bar-val');
+    const phoneScreenContainerEl = document.getElementById('phone-screen-container');
 
     function safeRoundRect(x, y, w, h, r) {
         try {
@@ -90,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const MAX_CAM_PAN = MAX_CAM_PAN_TILES * TILE_SIZE;
     const CAM_PAN_SPEED = 7.0;
 
-    // Flashlight & Battery System (100 Battery = 60 Seconds / 1 Min Discharge)
+    // Flashlight & Battery System
     let isFlashlightOn = false;
     let battery = 100.0;
     let flashlightToastTimeout = null;
@@ -573,10 +574,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.restore();
     }
 
-    // -------------------------------------------------------------
-    // DYNAMIC AMBIENT LIGHTING & 6-TILE SOFTENED FLASHLIGHT SECTOR CONE
-    // Features: 6-tile distance, origin vertex radial gradient (no sharp point), +1 tile player ambient expansion
-    // -------------------------------------------------------------
     function drawLightingOverlay(mapRenderX, mapRenderY) {
         try {
             if (!maskCtx) return;
@@ -590,27 +587,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const isFlashlightEquipped = hotbar[activeHotbarIndex] && hotbar[activeHotbarIndex].id === 'flashlight';
             const isFlashlightActive = isFlashlightEquipped && isFlashlightOn && battery > 0;
 
-            // Player Base Ambient Light: 1.8 tiles base, expands by +1 tile (2.8 tiles) when Flashlight is ON!
-            let playerBaseRadius = 1.8 * TILE_SIZE; // 144px
+            let playerBaseRadius = 1.8 * TILE_SIZE;
             if (isFlashlightActive) {
-                playerBaseRadius = 2.8 * TILE_SIZE; // 224px (+1 Tile expansion around player!)
+                playerBaseRadius = 2.8 * TILE_SIZE;
             }
 
             const campfireBaseRadius = 5.5 * TILE_SIZE;
             const flickerRadius = Math.sin(campfire.flickerTimer * 1.5) * 6;
             const campfireLightRadius = campfireBaseRadius + flickerRadius;
 
-            // 1. Clear offscreen mask canvas
             maskCtx.clearRect(0, 0, width, height);
-
-            // 2. Fill offscreen mask canvas with ambient darkness (96% darkness)
             maskCtx.fillStyle = 'rgba(10, 14, 23, 0.96)';
             maskCtx.fillRect(0, 0, width, height);
 
-            // 3. Cut out light holes using destination-out
             maskCtx.globalCompositeOperation = 'destination-out';
 
-            // --- Light Source 1: Player Ambient Light (Expands +1 tile when flashlight is ON) ---
+            // Light Source 1: Player Ambient Light
             const playerGrad = maskCtx.createRadialGradient(px, py, 10, px, py, playerBaseRadius);
             playerGrad.addColorStop(0, 'rgba(0, 0, 0, 0.85)');
             playerGrad.addColorStop(0.6, 'rgba(0, 0, 0, 0.35)');
@@ -621,7 +613,7 @@ document.addEventListener('DOMContentLoaded', () => {
             maskCtx.arc(px, py, playerBaseRadius, 0, Math.PI * 2);
             maskCtx.fill();
 
-            // --- Light Source 2: Center Campfire ---
+            // Light Source 2: Center Campfire
             const fireGrad = maskCtx.createRadialGradient(cx, cy, 15, cx, cy, campfireLightRadius);
             fireGrad.addColorStop(0, 'rgba(0, 0, 0, 0.92)');
             fireGrad.addColorStop(0.48, 'rgba(0, 0, 0, 0.5)');
@@ -633,35 +625,31 @@ document.addEventListener('DOMContentLoaded', () => {
             maskCtx.arc(cx, cy, campfireLightRadius, 0, Math.PI * 2);
             maskCtx.fill();
 
-            // --- Light Source 3: 6-Tile Softened Flashlight Sector / Cone Beam (When ON) ---
+            // Light Source 3: 6-Tile Softened Flashlight Sector / Cone Beam
             if (isFlashlightActive) {
-                const flashDistance = 6 * TILE_SIZE; // Expanded to 6 Tiles = 480px!
+                const flashDistance = 6 * TILE_SIZE;
                 const flashAngle = Math.atan2(mouseY - py, mouseX - px);
-                const halfCone = Math.PI / 6; // 60 deg cone
+                const halfCone = Math.PI / 6;
 
                 maskCtx.beginPath();
                 maskCtx.moveTo(px, py);
                 maskCtx.arc(px, py, flashDistance, flashAngle - halfCone, flashAngle + halfCone);
                 maskCtx.closePath();
 
-                // Radial gradient: Soft origin fade at vertex (0 to 0.08) + Soft end fade at 6 tiles (0.75 to 1.0)
                 const coneGrad = maskCtx.createRadialGradient(px, py, 0, px, py, flashDistance);
-                coneGrad.addColorStop(0, 'rgba(0, 0, 0, 0.15)');    // Soft origin fade (no sharp vertex point!)
-                coneGrad.addColorStop(0.08, 'rgba(0, 0, 0, 0.96)'); // Bright main beam body
-                coneGrad.addColorStop(0.75, 'rgba(0, 0, 0, 0.75)'); // Distance fade
-                coneGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');   // End fade
+                coneGrad.addColorStop(0, 'rgba(0, 0, 0, 0.15)');
+                coneGrad.addColorStop(0.08, 'rgba(0, 0, 0, 0.96)');
+                coneGrad.addColorStop(0.75, 'rgba(0, 0, 0, 0.75)');
+                coneGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
 
                 maskCtx.fillStyle = coneGrad;
                 maskCtx.fill();
             }
 
-            // Reset mask composite mode
             maskCtx.globalCompositeOperation = 'source-over';
-
-            // Draw darkness mask onto main game canvas
             ctx.drawImage(maskCanvas, 0, 0);
 
-            // 4. Draw Warm Campfire & Flashlight Beam Glow on Main Canvas
+            // Warm campfire glow
             ctx.save();
             const warmGlow = ctx.createRadialGradient(cx, cy, 10, cx, cy, 260 + flickerRadius);
             warmGlow.addColorStop(0, 'rgba(249, 115, 22, 0.32)');
@@ -673,9 +661,9 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.arc(cx, cy, 260 + flickerRadius, 0, Math.PI * 2);
             ctx.fill();
 
-            // Flashlight Yellow Beam Visual Overlay (Soft Origin & 6-Tile Length)
+            // Flashlight Yellow Beam Visual Overlay
             if (isFlashlightActive) {
-                const flashDistance = 6 * TILE_SIZE; // 480px
+                const flashDistance = 6 * TILE_SIZE;
                 const flashAngle = Math.atan2(mouseY - py, mouseX - px);
                 const halfCone = Math.PI / 6;
 
@@ -685,10 +673,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.closePath();
 
                 const beamGlow = ctx.createRadialGradient(px, py, 0, px, py, flashDistance);
-                beamGlow.addColorStop(0, 'rgba(254, 240, 138, 0.12)'); // Softened origin vertex
-                beamGlow.addColorStop(0.1, 'rgba(254, 240, 138, 0.45)'); // Golden beam core
+                beamGlow.addColorStop(0, 'rgba(254, 240, 138, 0.12)');
+                beamGlow.addColorStop(0.1, 'rgba(254, 240, 138, 0.45)');
                 beamGlow.addColorStop(0.7, 'rgba(253, 224, 71, 0.18)');
-                beamGlow.addColorStop(1.0, 'rgba(253, 224, 71, 0.0)');   // Softened beam end
+                beamGlow.addColorStop(1.0, 'rgba(253, 224, 71, 0.0)');
 
                 ctx.fillStyle = beamGlow;
                 ctx.fill();
@@ -701,9 +689,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // -------------------------------------------------------------
-    // OFF-SCREEN CHARACTER TRACKER RED ARROW
-    // -------------------------------------------------------------
     function drawOffScreenCharacterArrow(mapRenderX, mapRenderY) {
         const px = mapRenderX + player.x;
         const py = mapRenderY + player.y;
@@ -837,7 +822,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (hotbar[activeHotbarIndex]?.id !== 'flashlight') {
                 isFlashlightOn = false;
             }
-            renderHotbar();
+            renderAllUI();
         }
     }
 
@@ -1011,10 +996,21 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAllUI();
     }
 
+    function updatePhoneUIState() {
+        if (!phoneScreenContainerEl) return;
+        const equippedItem = hotbar[activeHotbarIndex];
+        if (equippedItem && equippedItem.id === 'phone') {
+            phoneScreenContainerEl.classList.remove('hidden');
+        } else {
+            phoneScreenContainerEl.classList.add('hidden');
+        }
+    }
+
     function renderAllUI() {
         renderHotbar();
         renderInventory();
         updateCamLockUI();
+        updatePhoneUIState();
     }
 
     renderAllUI();

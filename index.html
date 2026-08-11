@@ -89,15 +89,42 @@
         </div>
     </div>
 
-    <!-- Bottom Right Hotbar & Inventory Toggle Button -->
-    <div class="hotbar-wrapper">
-        <div id="hotbar-grid" class="hotbar-grid">
-            <!-- 3 Hotbar slots (1, 2, 3) -->
+    <!-- Bottom Right Stack: Phone UI (Above Hotbar) & Hotbar -->
+    <div class="bottom-right-stack">
+        <!-- Smartphone UI (20:9 Ratio Vertical Screen) -->
+        <div id="phone-screen-container" class="phone-screen-container hidden">
+            <div class="phone-frame">
+                <div class="phone-notch"></div>
+                <div class="phone-screen-body">
+                    <div class="phone-status-bar">
+                        <span class="phone-time">22:08</span>
+                        <div class="phone-status-icons">
+                            <span>📶</span>
+                            <span>🔋</span>
+                        </div>
+                    </div>
+                    <!-- Clean White Screen Area -->
+                    <div class="phone-content">
+                        <div class="phone-placeholder">
+                            <span class="phone-icon-big">📱</span>
+                            <span class="phone-title">MY PHONE</span>
+                        </div>
+                    </div>
+                    <div class="phone-home-bar"></div>
+                </div>
+            </div>
         </div>
-        <button id="btn-toggle-inventory" class="btn-inv-toggle" title="인벤토리 열기/닫기 (Tab)">
-            <span class="inv-icon">🎒</span>
-            <span class="inv-badge">Tab</span>
-        </button>
+
+        <!-- Hotbar Wrapper -->
+        <div class="hotbar-wrapper">
+            <div id="hotbar-grid" class="hotbar-grid">
+                <!-- 3 Hotbar slots (1, 2, 3) -->
+            </div>
+            <button id="btn-toggle-inventory" class="btn-inv-toggle" title="인벤토리 열기/닫기 (Tab)">
+                <span class="inv-icon">🎒</span>
+                <span class="inv-badge">Tab</span>
+            </button>
+        </div>
     </div>
 
     <script src="script.js"></script>
