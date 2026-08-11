@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Campfire & Warm Dual Light System
+// mysol 2D Pixel Game Engine - Offscreen Masking Architecture for Dual Light System
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -27,6 +27,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // -------------------------------------------------------------
+    // OFFSCREEN CANVAS FOR LIGHTING & DARKNESS MASKING
+    // -------------------------------------------------------------
+    const maskCanvas = document.createElement('canvas');
+    const maskCtx = maskCanvas.getContext('2d');
+
     // Canvas & Map Parameters
     let width = 800;
     let height = 600;
@@ -39,8 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let mapStartY = 100;
 
     function resizeCanvas() {
-        width = canvas.width = window.innerWidth || document.documentElement.clientWidth || 800;
-        height = canvas.height = window.innerHeight || document.documentElement.clientHeight || 600;
+        width = canvas.width = maskCanvas.width = window.innerWidth || document.documentElement.clientWidth || 800;
+        height = canvas.height = maskCanvas.height = window.innerHeight || document.documentElement.clientHeight || 600;
         
         mapStartX = Math.max(20, Math.floor((width - MAP_DIM) / 2));
         mapStartY = Math.max(70, Math.floor((height - MAP_DIM) / 2));
@@ -187,12 +193,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function render() {
         try {
-            // Fill Canvas Background
+            // 1. Fill Canvas Background with Dark Slate Color
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(0, 0, width, height);
             ctx.imageSmoothingEnabled = false;
 
-            // Draw World Elements
+            // 2. Draw World Elements on Main Canvas
             ctx.save();
             ctx.translate(mapStartX, mapStartY);
 
@@ -206,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             ctx.restore();
 
-            // Draw Dynamic Ambient Lighting Overlay (Player + Campfire Dual Light)
+            // 3. Draw Dynamic Ambient Lighting Mask (Player + Campfire Light Cutout via Offscreen Canvas)
             drawLightingOverlay();
 
             update();
@@ -283,13 +289,11 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.lineTo(14, -10);
         ctx.stroke();
 
-        // Log Accents
         ctx.strokeStyle = '#451a03';
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // 3. Pixel Flames (Flickering Outer Orange & Inner Yellow Core)
-        // Outer Flame (Red-Orange)
+        // 3. Pixel Flames
         ctx.fillStyle = '#f97316';
         ctx.beginPath();
         ctx.moveTo(-12, 2);
@@ -297,7 +301,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.closePath();
         ctx.fill();
 
-        // Inner Flame (Bright Gold/Yellow)
         ctx.fillStyle = '#fbbf24';
         ctx.beginPath();
         ctx.moveTo(-7, 2);
@@ -305,7 +308,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.closePath();
         ctx.fill();
 
-        // Core White Hot Spark
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.arc(0, -2, 3 + Math.abs(flicker * 0.5), 0, Math.PI * 2);
@@ -421,12 +423,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // Dual Light Source Ambient Darkness System (Player Light + Campfire Light)
-    // Both light sources have equal intensity & 3-tile light radius (270px)
-    // Campfire is surrounded by cozy warm orange/gold glowing warmth!
+    // OFFSCREEN CANVAS LIGHTING OVERLAY ENGINE
+    // Uses maskCanvas to cut out light holes safely without erasing main canvas!
     // -------------------------------------------------------------
     function drawLightingOverlay() {
         try {
+            if (!maskCtx) return;
+
             const px = mapStartX + player.x;
             const py = mapStartY + player.y;
 
@@ -434,56 +437,62 @@ document.addEventListener('DOMContentLoaded', () => {
             const cy = mapStartY + campfire.y;
 
             const tile6 = 6 * TILE_SIZE; // 540px (6 tiles max dark boundary)
-            const flickerRadius = Math.sin(campfire.flickerTimer * 1.5) * 8;
+            const flickerRadius = Math.sin(campfire.flickerTimer * 1.5) * 6;
             const campfireLightRadius = tile6 + flickerRadius;
 
-            ctx.save();
+            // 1. Clear offscreen mask canvas
+            maskCtx.clearRect(0, 0, width, height);
 
-            // 1. Fill entire screen with dark ambient overlay
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.96)';
-            ctx.fillRect(0, 0, width, height);
+            // 2. Fill offscreen mask canvas with ambient darkness (94% darkness)
+            maskCtx.fillStyle = 'rgba(11, 14, 23, 0.94)';
+            maskCtx.fillRect(0, 0, width, height);
 
-            // 2. Erase darkness around light sources using destination-out composite mode
-            ctx.globalCompositeOperation = 'destination-out';
+            // 3. Cut out light holes in the darkness layer using destination-out
+            maskCtx.globalCompositeOperation = 'destination-out';
 
             // --- Light Source 1: Player Character ---
-            const playerGrad = ctx.createRadialGradient(px, py, 15, px, py, tile6);
+            const playerGrad = maskCtx.createRadialGradient(px, py, 15, px, py, tile6);
             playerGrad.addColorStop(0, 'rgba(0, 0, 0, 0.85)');     // Center: 85% light cutout
             playerGrad.addColorStop(0.48, 'rgba(0, 0, 0, 0.45)');  // 3 tiles: 45% light cutout
             playerGrad.addColorStop(0.85, 'rgba(0, 0, 0, 0.1)');   // 5 tiles: 10% light cutout
-            playerGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');    // 6+ tiles: 0% cutout (leaves darkness)
+            playerGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');    // 6+ tiles: 0% cutout
 
-            ctx.fillStyle = playerGrad;
-            ctx.beginPath();
-            ctx.arc(px, py, tile6, 0, Math.PI * 2);
-            ctx.fill();
+            maskCtx.fillStyle = playerGrad;
+            maskCtx.beginPath();
+            maskCtx.arc(px, py, tile6, 0, Math.PI * 2);
+            maskCtx.fill();
 
             // --- Light Source 2: Center Campfire ---
-            const fireGrad = ctx.createRadialGradient(cx, cy, 15, cx, cy, campfireLightRadius);
-            fireGrad.addColorStop(0, 'rgba(0, 0, 0, 0.9)');       // Center: 90% light cutout
-            fireGrad.addColorStop(0.48, 'rgba(0, 0, 0, 0.5)');   // 3 tiles: 50% light cutout
+            const fireGrad = maskCtx.createRadialGradient(cx, cy, 15, cx, cy, campfireLightRadius);
+            fireGrad.addColorStop(0, 'rgba(0, 0, 0, 0.92)');     // Center: 92% light cutout
+            fireGrad.addColorStop(0.48, 'rgba(0, 0, 0, 0.5)');    // 3 tiles: 50% light cutout
             fireGrad.addColorStop(0.85, 'rgba(0, 0, 0, 0.12)');  // 5 tiles: 12% light cutout
             fireGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');    // 6+ tiles: 0% cutout
 
-            ctx.fillStyle = fireGrad;
-            ctx.beginPath();
-            ctx.arc(cx, cy, campfireLightRadius, 0, Math.PI * 2);
-            ctx.fill();
+            maskCtx.fillStyle = fireGrad;
+            maskCtx.beginPath();
+            maskCtx.arc(cx, cy, campfireLightRadius, 0, Math.PI * 2);
+            maskCtx.fill();
 
-            // 3. Reset composite mode to source-over and draw warm golden/orange campfire glow
-            ctx.globalCompositeOperation = 'source-over';
+            // Reset mask composite mode
+            maskCtx.globalCompositeOperation = 'source-over';
 
-            const warmGlow = ctx.createRadialGradient(cx, cy, 10, cx, cy, 260 + flickerRadius);
-            warmGlow.addColorStop(0, 'rgba(249, 115, 22, 0.35)');  // Cozy warm orange core
-            warmGlow.addColorStop(0.4, 'rgba(251, 191, 36, 0.18)'); // Golden warmth
+            // 4. Draw darkness mask onto main game canvas
+            ctx.drawImage(maskCanvas, 0, 0);
+
+            // 5. Draw warm golden/orange campfire glow overlay on main canvas
+            ctx.save();
+            const warmGlow = ctx.createRadialGradient(cx, cy, 10, cx, cy, 270 + flickerRadius);
+            warmGlow.addColorStop(0, 'rgba(249, 115, 22, 0.3)');   // Cozy warm orange core
+            warmGlow.addColorStop(0.4, 'rgba(251, 191, 36, 0.15)'); // Golden warmth
             warmGlow.addColorStop(1.0, 'rgba(251, 191, 36, 0.0)');  // Soft fade out
 
             ctx.fillStyle = warmGlow;
             ctx.beginPath();
-            ctx.arc(cx, cy, 260 + flickerRadius, 0, Math.PI * 2);
+            ctx.arc(cx, cy, 270 + flickerRadius, 0, Math.PI * 2);
             ctx.fill();
-
             ctx.restore();
+
         } catch (err) {
             console.error('Lighting overlay error:', err);
         }
