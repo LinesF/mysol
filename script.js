@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - 100% Defensive Failsafe Rendering Engine
+// mysol 2D Pixel Game Engine - Crash-Proof Ambient Lighting System (3 Tiles Bright, 6+ Tiles Pitch Black)
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -177,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function render() {
         try {
-            // Fill Canvas Background with Slate Color
+            // Fill Canvas Background
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(0, 0, width, height);
             ctx.imageSmoothingEnabled = false;
@@ -195,6 +195,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             ctx.restore();
 
+            // Draw Dynamic Ambient Lighting Overlay
+            drawLightingOverlay();
+
             update();
         } catch (err) {
             console.error('Render loop error:', err);
@@ -203,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(render);
     }
 
-    // Draw 5x5 Vibrant Checkered Grass Map (450x450px)
+    // Draw 5x5 Checkered Grass Map (450x450px)
     function drawGrassTilemap() {
         for (let row = 0; row < GRID_SIZE; row++) {
             for (let col = 0; col < GRID_SIZE; col++) {
@@ -342,6 +345,37 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fillText(bubble.text, px, by + bubbleH / 2);
 
         ctx.restore();
+    }
+
+    // -------------------------------------------------------------
+    // Crash-Proof Dynamic Ambient Lighting Overlay
+    // Rules: 3x3 tiles (270px) = slightly bright, 3~6 tiles = gradually darkens, 6+ tiles (540px+) = 100% pitch black
+    // -------------------------------------------------------------
+    function drawLightingOverlay() {
+        try {
+            const px = mapStartX + player.x;
+            const py = mapStartY + player.y;
+
+            // Distance in pixels based on 90px Tile Size
+            const tile3 = 3 * TILE_SIZE; // 270px (3 tiles)
+            const tile6 = 6 * TILE_SIZE; // 540px (6 tiles)
+
+            ctx.save();
+
+            // Create Radial Gradient centered on player position
+            const grad = ctx.createRadialGradient(px, py, 15, px, py, tile6);
+            grad.addColorStop(0, 'rgba(0, 0, 0, 0.05)');    // Player center: 95% bright
+            grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.35)');  // 3 tiles radius (270px): slightly bright
+            grad.addColorStop(0.85, 'rgba(0, 0, 0, 0.85)'); // Distance 4~5 tiles: progressively darkens
+            grad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)');   // 6+ tiles (540px+): 100% pitch black darkness
+
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.restore();
+        } catch (err) {
+            console.error('Lighting overlay error:', err);
+        }
     }
 
     // -------------------------------------------------------------
@@ -581,7 +615,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderInventory();
     }
 
-    // Start 60fps Render Loop & Render UI
     renderAllUI();
     render();
 });
