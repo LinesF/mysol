@@ -1,8 +1,8 @@
-// mysol 2D Pixel Game Engine - Fixed Keyboard & Chat Input Execution Order
+// mysol 2D Pixel Game Engine - Fix Movement Bug & Disable Movement on Chat / Inventory Open
 
 document.addEventListener('DOMContentLoaded', () => {
     // -------------------------------------------------------------
-    // 1. ALL DOM ELEMENTS (DECLARED AT TOP TO PREVENT REFERENCE ERRORS)
+    // 1. ALL DOM ELEMENTS
     // -------------------------------------------------------------
     const canvas = document.getElementById('game-canvas');
     const ctx = canvas.getContext('2d');
@@ -50,10 +50,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Active Speech Bubble State
-    // Duration rules: 1~10 chars -> 4.5s, 11~15 chars -> 6s, 16~20 chars -> 7.5s
     let activeSpeechBubble = null;
 
+    // Movement Key Tracker
     const keys = {};
+
+    function resetKeys() {
+        for (let k in keys) {
+            keys[k] = false;
+        }
+    }
 
     // Keyboard Event Listener
     window.addEventListener('keydown', (e) => {
@@ -81,24 +87,37 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === '2') setEquippedSlot(1);
         if (e.key === '3') setEquippedSlot(2);
 
+        // Disable movement if inventory is open
+        if (!inventoryWindowEl.classList.contains('hidden')) {
+            return;
+        }
+
         const key = e.key.toLowerCase();
         keys[key] = true;
         keys[e.key] = true;
     });
 
+    // Always release keys on keyup to prevent stuck movement!
     window.addEventListener('keyup', (e) => {
-        if (document.activeElement === chatInputEl) return;
         const key = e.key.toLowerCase();
         keys[key] = false;
         keys[e.key] = false;
     });
 
+    // Reset keys on window blur or input focus
+    window.addEventListener('blur', resetKeys);
+    chatInputEl.addEventListener('focus', resetKeys);
+
     function update() {
-        // Stop movement if typing in chat
-        if (document.activeElement === chatInputEl) {
+        const isChatFocused = (document.activeElement === chatInputEl);
+        const isInventoryOpen = !inventoryWindowEl.classList.contains('hidden');
+
+        // Completely disable movement when typing in chat OR when inventory is open!
+        if (isChatFocused || isInventoryOpen) {
             player.isMoving = false;
             player.animFrame = 0;
             player.animTimer = 0;
+            resetKeys();
             return;
         }
 
@@ -327,10 +346,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleChatEnterKey() {
         if (document.activeElement !== chatInputEl) {
-            // Focus chat input field
+            resetKeys();
             chatInputEl.focus();
         } else {
-            // Already in chat input -> Submit message if not empty
             const text = chatInputEl.value.trim();
             if (text.length > 0) {
                 let duration = 4.5;
@@ -350,6 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 chatCharCountEl.textContent = '0/20';
             }
             chatInputEl.blur();
+            resetKeys();
         }
     }
 
@@ -377,6 +396,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function toggleInventory() {
+        resetKeys();
         inventoryWindowEl.classList.toggle('hidden');
     }
 
