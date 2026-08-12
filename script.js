@@ -815,12 +815,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     const kickBtn = document.createElement('button');
                     kickBtn.className = 'kick-player-btn';
                     kickBtn.textContent = '🚫 강퇴';
-                    kickBtn.addEventListener('click', () => {
+                    kickBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
                         if (ws && ws.readyState === WebSocket.OPEN) {
                             ws.send(JSON.stringify({
                                 type: 'KICK_PLAYER',
                                 targetSocketId: p.id
                             }));
+                            showFlashlightToast(`🚫 [${p.username}] 님을 강제 퇴장시켰습니다.`);
                         }
                     });
                     badge.appendChild(kickBtn);
