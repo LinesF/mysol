@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 15: Top-to-Bottom White Cooldown Overlay & 0.5s Fast Charge Attack System
+// mysol 2D Pixel Game Engine - Step 16: Sprint / Run System (Shift Key Speed Boost & Orange Stamina Bar Management)
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -19,6 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const flashlightToastEl = document.getElementById('flashlight-toast');
     const batteryBarFillEl = document.getElementById('battery-bar-fill');
     const batteryBarValEl = document.getElementById('battery-bar-val');
+    const staminaBarFillEl = document.getElementById('stamina-bar-fill');
+    const staminaBarValEl = document.getElementById('stamina-bar-val');
     const phoneScreenContainerEl = document.getElementById('phone-screen-container');
 
     function safeRoundRect(x, y, w, h, r) {
@@ -65,14 +67,18 @@ document.addEventListener('DOMContentLoaded', () => {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Player Position
+    // Player Position & Movement Parameters
+    const NORMAL_SPEED = 3.5;
+    const SPRINT_SPEED = 6.0;
+
     const player = {
         x: MAP_DIM / 2,
         y: MAP_DIM / 2 + 80,
         size: 36,
-        speed: 3.5,
+        speed: NORMAL_SPEED,
         direction: 'down',
         isMoving: false,
+        isSprinting: false,
         animFrame: 0,
         animTimer: 0
     };
@@ -97,11 +103,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let flashlightToastTimeout = null;
     let warningToastTimeout = null;
 
+    // Stamina System for Sprinting
+    let stamina = 100.0;
+
     // Bare Hands Combat & Cooldown System
     let isBareHandsCharging = false;
     let chargeHoldTimer = 0.0;
     let attackCooldownTimer = 0.0;
-    let maxAttackCooldownDuration = 0.35; // Total cooldown duration for top-to-bottom drain calculation
+    let maxAttackCooldownDuration = 0.35;
     let activeAttackAnimation = null;
 
     function showFlashlightToast(text) {
@@ -182,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // BARE HANDS ATTACK & CHARGE LOGIC (0.5s Charge & Top-to-Bottom Cooldown Drain)
+    // BARE HANDS ATTACK & CHARGE LOGIC
     // -------------------------------------------------------------
     function startBareHandsCharge() {
         const equipped = hotbar[activeHotbarIndex];
@@ -207,7 +216,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const attackAngle = Math.atan2(mouseY - screenCenterY, mouseX - screenCenterX);
 
         if (chargeHoldTimer >= 0.5) {
-            // Charged AoE Sector Attack!
             activeAttackAnimation = {
                 type: 'charged',
                 angle: attackAngle,
@@ -217,7 +225,6 @@ document.addEventListener('DOMContentLoaded', () => {
             attackCooldownTimer = 0.45;
             maxAttackCooldownDuration = 0.45;
         } else {
-            // Normal Front Melee Attack!
             activeAttackAnimation = {
                 type: 'normal',
                 angle: attackAngle,
@@ -271,6 +278,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        if (e.key === 'Shift') {
+            keys['shift'] = true;
+        }
+
         if (e.key === 'f' || e.key === 'F') {
             e.preventDefault();
             const equipped = hotbar[activeHotbarIndex];
@@ -315,6 +326,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.addEventListener('keyup', (e) => {
+        if (e.key === 'Shift') {
+            keys['shift'] = false;
+        }
+
         if ((e.key === 'f' || e.key === 'F') && isBareHandsCharging) {
             releaseBareHandsAttack();
         }
@@ -329,7 +344,6 @@ document.addEventListener('DOMContentLoaded', () => {
         chatInputEl.addEventListener('focus', resetKeys);
     }
 
-    // Update Charge (Bottom-to-Top) & Cooldown (Top-to-Bottom) Overlays on Hotbar Slot 1
     function updateSlot1ChargeOverlay() {
         if (!hotbarGridEl) return;
         const slot1El = hotbarGridEl.children[0];
@@ -361,7 +375,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (attackCooldownTimer > 0) {
             chargeOverlayEl.style.height = '0%';
             chargeOverlayEl.classList.remove('charged-ready');
-            // Cooldown overlay drains from TOP to BOTTOM
             const cdPct = Math.min(100, (attackCooldownTimer / maxAttackCooldownDuration) * 100);
             cooldownOverlayEl.style.height = `${cdPct}%`;
         } else {
@@ -377,6 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (isChatFocused || isInventoryOpen) {
             player.isMoving = false;
+            player.isSprinting = false;
             player.animFrame = 0;
             player.animTimer = 0;
             resetKeys();
@@ -433,7 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
             batteryBarValEl.textContent = Math.round(battery);
         }
 
-        // WASD Movement Keys
+        // WASD Movement & Sprint Logic
         let isWASD = false;
         let dx = 0;
         let dy = 0;
@@ -473,8 +487,41 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        const isShiftPressed = keys['shift'] || keys['Shift'];
         player.isMoving = isWASD && (dx !== 0 || dy !== 0);
 
+        // Sprinting Logic
+        if (player.isMoving && isShiftPressed && stamina > 0) {
+            player.isSprinting = true;
+            player.speed = SPRINT_SPEED;
+
+            // Stamina Discharge while sprinting
+            stamina -= 16.0 * (1 / 60);
+            if (stamina < 0) stamina = 0;
+        } else {
+            player.isSprinting = false;
+            player.speed = NORMAL_SPEED;
+
+            // Stamina Recharge when not sprinting
+            if (player.isMoving) {
+                // Moving without shift (walking) -> Slow Recharge
+                stamina += 10.0 * (1 / 60);
+            } else {
+                // Completely still (idle) -> Faster Recharge
+                stamina += 25.0 * (1 / 60);
+            }
+            if (stamina > 100) stamina = 100;
+        }
+
+        // Update Orange Stamina Bar HUD
+        if (staminaBarFillEl) {
+            staminaBarFillEl.style.width = `${Math.max(0, Math.min(100, stamina))}%`;
+        }
+        if (staminaBarValEl) {
+            staminaBarValEl.textContent = Math.round(stamina);
+        }
+
+        // Move Player Position
         if (player.isMoving) {
             if (dx !== 0 && dy !== 0) {
                 dx *= 0.7071;
@@ -488,8 +535,9 @@ document.addEventListener('DOMContentLoaded', () => {
             player.x = Math.max(halfSize + 4, Math.min(MAP_DIM - halfSize - 4, player.x));
             player.y = Math.max(halfSize + 4, Math.min(MAP_DIM - halfSize - 4, player.y));
 
+            const animSpeedThreshold = player.isSprinting ? 5 : 8;
             player.animTimer++;
-            if (player.animTimer > 8) {
+            if (player.animTimer > animSpeedThreshold) {
                 player.animFrame = (player.animFrame + 1) % 4;
                 player.animTimer = 0;
             }
@@ -637,7 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const px = player.x;
         const py = player.y;
 
-        const bounceY = (player.isMoving && (player.animFrame % 2 === 1)) ? -3 : 0;
+        const bounceY = (player.isMoving && (player.animFrame % 2 === 1)) ? (player.isSprinting ? -5 : -3) : 0;
 
         ctx.save();
         ctx.translate(px, py + bounceY);
@@ -769,7 +817,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.beginPath();
         ctx.moveTo(px - 5, by + bubbleH);
         ctx.lineTo(px, by + bubbleH + 6);
-        ctx.lineTo(px + 5, by + bubbleH);
+        ctx.lineTo(px + 5, by + bubbleH + 6);
         ctx.fillStyle = '#0f172a';
         ctx.fill();
         ctx.strokeStyle = '#38bdf8';
