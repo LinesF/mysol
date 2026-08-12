@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 25: Node.js Backend Server Auth Integration & Real-Time WebSocket Multiplayer Sync
+// mysol 2D Pixel Game Engine - Step 26: 60-Second Email Verification Code Countdown & Resend Button UX Mechanics
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -58,6 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // -------------------------------------------------------------
     let currentUser = null;
     const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    let verificationTimer = null;
+    let countdownSeconds = 60;
 
     // Switch between Login and Sign Up tabs
     if (tabBtnLoginEl && tabBtnSignupEl) {
@@ -76,7 +78,35 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 1. Dispatch Verification Code API Call
+    function startVerificationCountdown() {
+        if (verificationTimer) clearInterval(verificationTimer);
+        countdownSeconds = 60;
+
+        if (btnSendCodeEl) {
+            btnSendCodeEl.disabled = true;
+            btnSendCodeEl.classList.add('disabled-btn');
+            btnSendCodeEl.textContent = `발송됨 (${countdownSeconds}초)`;
+        }
+
+        verificationTimer = setInterval(() => {
+            countdownSeconds--;
+            if (countdownSeconds > 0) {
+                if (btnSendCodeEl) {
+                    btnSendCodeEl.textContent = `발송됨 (${countdownSeconds}초)`;
+                }
+            } else {
+                clearInterval(verificationTimer);
+                verificationTimer = null;
+                if (btnSendCodeEl) {
+                    btnSendCodeEl.disabled = false;
+                    btnSendCodeEl.classList.remove('disabled-btn');
+                    btnSendCodeEl.textContent = '재발송';
+                }
+            }
+        }, 1000);
+    }
+
+    // 1. Dispatch Verification Code API Call & 60s Countdown
     if (btnSendCodeEl) {
         btnSendCodeEl.addEventListener('click', async () => {
             const rawEmail = (signupEmailEl ? signupEmailEl.value : '').trim();
@@ -97,14 +127,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (data.success) {
                     showFlashlightToast(`📩 [인증 코드 발송] ${rawEmail} -> [ ${data.previewCode || '메일 확인'} ]`);
                     if (signupCodeEl) signupCodeEl.focus();
+                    startVerificationCountdown();
                 } else {
                     showFlashlightToast(`⚠️ ${data.message}`);
                 }
             } catch (err) {
-                // Fallback to local simulation if backend is launching
                 const code = Math.floor(100000 + Math.random() * 900000).toString();
                 showFlashlightToast(`📩 [인증 코드] ${rawEmail} -> [ ${code} ]`);
                 if (signupCodeEl) signupCodeEl.focus();
+                startVerificationCountdown();
             }
         });
     }
@@ -119,6 +150,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!rawEmail || !EMAIL_REGEX.test(rawEmail)) {
                 showFlashlightToast('⚠️ 올바른 이메일 형식을 입력해 주세요.');
+                return;
+            }
+
+            if (!code) {
+                showFlashlightToast('⚠️ 인증 코드를 입력해 주세요.');
                 return;
             }
 
@@ -141,6 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const data = await res.json();
                 if (data.success) {
+                    if (verificationTimer) clearInterval(verificationTimer);
                     showFlashlightToast(`🎉 ${data.message}`);
                     enterGame(data.user);
                 } else {
@@ -148,6 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (err) {
                 const username = rawEmail.split('@')[0];
+                if (verificationTimer) clearInterval(verificationTimer);
                 showFlashlightToast(`🎉 계정이 생성되었습니다! [${username}]`);
                 enterGame({ username, email: rawEmail, avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${username}` });
             }
@@ -1039,10 +1077,7 @@ document.addEventListener('DOMContentLoaded', () => {
             drawGrassTilemap();
             drawCampfire();
             drawDashGhostTrails();
-
-            // Render Online Remote Players
             drawRemotePlayers();
-
             drawPlayerCharacter();
 
             if (activeAttackAnimation) {
@@ -1075,35 +1110,29 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.save();
             ctx.translate(rp.x, rp.y);
 
-            // Shadow
             ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
             ctx.beginPath();
             ctx.ellipse(0, 16, 16, 7, 0, 0, Math.PI * 2);
             ctx.fill();
 
-            // Feet
             ctx.fillStyle = '#334155';
             ctx.fillRect(-12, 10, 10, 8);
             ctx.fillRect(2, 10, 10, 8);
 
-            // Body (Green/Teal shirt for remote player distinction)
             ctx.fillStyle = '#0d9488';
             ctx.fillRect(-14, -6, 28, 18);
             ctx.fillStyle = '#2dd4bf';
             ctx.fillRect(-12, -6, 24, 5);
 
-            // Hair & Head
             ctx.fillStyle = '#a855f7';
             ctx.fillRect(-16, -24, 32, 12);
             ctx.fillStyle = '#fed7aa';
             ctx.fillRect(-14, -14, 28, 12);
 
-            // Face Eyes
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(-7, -11, 5, 5);
             ctx.fillRect(2, -11, 5, 5);
 
-            // Username Label Tag
             ctx.font = "700 0.75rem 'Inter', sans-serif";
             ctx.fillStyle = '#38bdf8';
             ctx.textAlign = 'center';

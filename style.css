@@ -266,9 +266,17 @@ body {
     transition: all 0.2s ease;
 }
 
-.action-sub-btn:hover {
+.action-sub-btn:hover:not(:disabled) {
     background: var(--slot-active);
     color: #0f172a;
+}
+
+.action-sub-btn:disabled, .action-sub-btn.disabled-btn {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: rgba(148, 163, 184, 0.12);
+    color: var(--text-muted);
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
 /* Submit & Guest Buttons */
