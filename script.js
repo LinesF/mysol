@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 29: Separate Email Verification Confirmation & Relaxed Password Setup UX
+// mysol 2D Pixel Game Engine - Step 31: Real-Time Password Mismatch & Login Error Red Border Visual Feedback
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -79,6 +79,45 @@ document.addEventListener('DOMContentLoaded', () => {
             tabBtnLoginEl.classList.remove('active');
             if (authFormSignupEl) authFormSignupEl.classList.remove('hidden');
             if (authFormLoginEl) authFormLoginEl.classList.add('hidden');
+        });
+    }
+
+    // Real-Time Password Confirm Red/Green Border Feedback
+    function validatePasswordConfirmMatch() {
+        const pass = signupPasswordEl ? signupPasswordEl.value : '';
+        const confirm = signupPasswordConfirmEl ? signupPasswordConfirmEl.value : '';
+
+        if (!signupPasswordConfirmEl) return;
+
+        if (confirm.length > 0) {
+            if (pass !== confirm) {
+                signupPasswordConfirmEl.classList.add('input-error');
+                signupPasswordConfirmEl.classList.remove('input-success');
+            } else {
+                signupPasswordConfirmEl.classList.remove('input-error');
+                signupPasswordConfirmEl.classList.add('input-success');
+            }
+        } else {
+            signupPasswordConfirmEl.classList.remove('input-error', 'input-success');
+        }
+    }
+
+    if (signupPasswordEl) {
+        signupPasswordEl.addEventListener('input', validatePasswordConfirmMatch);
+    }
+    if (signupPasswordConfirmEl) {
+        signupPasswordConfirmEl.addEventListener('input', validatePasswordConfirmMatch);
+    }
+
+    // Login Input Error Reset on User Typing
+    if (loginEmailEl) {
+        loginEmailEl.addEventListener('input', () => {
+            loginEmailEl.classList.remove('input-error');
+        });
+    }
+    if (loginPasswordEl) {
+        loginPasswordEl.addEventListener('input', () => {
+            loginPasswordEl.classList.remove('input-error');
         });
     }
 
@@ -283,11 +322,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (password.length < 6) {
+                if (signupPasswordEl) signupPasswordEl.classList.add('input-error');
                 showFlashlightToast('⚠️ 비밀번호는 최소 6자리 이상이어야 합니다.');
                 return;
             }
 
             if (password !== passwordConfirm) {
+                if (signupPasswordConfirmEl) signupPasswordConfirmEl.classList.add('input-error');
                 showFlashlightToast('⚠️ 비밀번호 재확인이 일치하지 않습니다.');
                 return;
             }
@@ -316,13 +357,15 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 3. Submit Email Login API
+    // 3. Submit Email Login API (With Red Border Error Feedback)
     if (btnLoginSubmitEl) {
         btnLoginSubmitEl.addEventListener('click', async () => {
             const rawEmail = (loginEmailEl ? loginEmailEl.value : '').trim();
             const password = loginPasswordEl ? loginPasswordEl.value : '';
 
             if (!rawEmail || !password) {
+                if (!rawEmail && loginEmailEl) loginEmailEl.classList.add('input-error');
+                if (!password && loginPasswordEl) loginPasswordEl.classList.add('input-error');
                 showFlashlightToast('⚠️ 이메일과 비밀번호를 모두 입력해 주세요.');
                 return;
             }
@@ -336,9 +379,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const data = await res.json();
                 if (data.success) {
+                    if (loginEmailEl) loginEmailEl.classList.remove('input-error');
+                    if (loginPasswordEl) loginPasswordEl.classList.remove('input-error');
                     showFlashlightToast(`🔑 ${data.message}`);
                     enterGame(data.user);
                 } else {
+                    if (loginPasswordEl) loginPasswordEl.classList.add('input-error');
+                    if (loginEmailEl) loginEmailEl.classList.add('input-error');
                     showFlashlightToast(`⚠️ ${data.message}`);
                 }
             } catch (err) {
