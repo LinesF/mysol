@@ -578,6 +578,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const btnPhoneJoinOtherRoomEl = document.getElementById('btn-phone-join-other-room');
+    if (btnPhoneJoinOtherRoomEl) {
+        btnPhoneJoinOtherRoomEl.addEventListener('click', () => {
+            showPhoneView('join');
+            fetchPublicRoomList();
+        });
+    }
+
     if (btnPhoneBackCreateEl) {
         btnPhoneBackCreateEl.addEventListener('click', () => showPhoneView('main'));
     }
