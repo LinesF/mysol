@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 14: 0.5s Fast Charge Time & Attack Cooldown System to Prevent Spamming
+// mysol 2D Pixel Game Engine - Step 15: Top-to-Bottom White Cooldown Overlay & 0.5s Fast Charge Attack System
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -97,10 +97,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let flashlightToastTimeout = null;
     let warningToastTimeout = null;
 
-    // Bare Hands Combat System (0.5s Fast Charge & Attack Cooldown System)
+    // Bare Hands Combat & Cooldown System
     let isBareHandsCharging = false;
-    let chargeHoldTimer = 0.0; // Seconds held (0.0s to 0.5s)
-    let attackCooldownTimer = 0.0; // Cooldown timer to prevent attack spamming
+    let chargeHoldTimer = 0.0;
+    let attackCooldownTimer = 0.0;
+    let maxAttackCooldownDuration = 0.35; // Total cooldown duration for top-to-bottom drain calculation
     let activeAttackAnimation = null;
 
     function showFlashlightToast(text) {
@@ -181,13 +182,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // BARE HANDS ATTACK & CHARGE LOGIC (0.5s Charge & Cooldown)
+    // BARE HANDS ATTACK & CHARGE LOGIC (0.5s Charge & Top-to-Bottom Cooldown Drain)
     // -------------------------------------------------------------
     function startBareHandsCharge() {
         const equipped = hotbar[activeHotbarIndex];
         if (!equipped || equipped.id !== 'hands') return;
-
-        // Prevent attacking if currently on cooldown!
         if (attackCooldownTimer > 0) return;
 
         isBareHandsCharging = true;
@@ -208,14 +207,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const attackAngle = Math.atan2(mouseY - screenCenterY, mouseX - screenCenterX);
 
         if (chargeHoldTimer >= 0.5) {
-            // Charged AoE Sector Attack! (0.5s Fast Charge)
+            // Charged AoE Sector Attack!
             activeAttackAnimation = {
                 type: 'charged',
                 angle: attackAngle,
                 totalDuration: 0.35,
                 remainingTime: 0.35
             };
-            attackCooldownTimer = 0.45; // 0.45s Cooldown after heavy charged attack
+            attackCooldownTimer = 0.45;
+            maxAttackCooldownDuration = 0.45;
         } else {
             // Normal Front Melee Attack!
             activeAttackAnimation = {
@@ -224,7 +224,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 totalDuration: 0.22,
                 remainingTime: 0.22
             };
-            attackCooldownTimer = 0.35; // 0.35s Cooldown after normal attack
+            attackCooldownTimer = 0.35;
+            maxAttackCooldownDuration = 0.35;
         }
 
         isBareHandsCharging = false;
@@ -242,7 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.addEventListener('mousedown', (e) => {
-        if (e.button === 2) { // Mouse Right Click
+        if (e.button === 2) {
             if (chatInputEl && document.activeElement === chatInputEl) return;
             const equipped = hotbar[activeHotbarIndex];
             if (equipped && equipped.id === 'hands') {
@@ -252,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.addEventListener('mouseup', (e) => {
-        if (e.button === 2) { // Mouse Right Click Release
+        if (e.button === 2) {
             if (isBareHandsCharging) {
                 releaseBareHandsAttack();
             }
@@ -328,29 +329,45 @@ document.addEventListener('DOMContentLoaded', () => {
         chatInputEl.addEventListener('focus', resetKeys);
     }
 
+    // Update Charge (Bottom-to-Top) & Cooldown (Top-to-Bottom) Overlays on Hotbar Slot 1
     function updateSlot1ChargeOverlay() {
         if (!hotbarGridEl) return;
         const slot1El = hotbarGridEl.children[0];
         if (!slot1El) return;
 
-        let overlayEl = slot1El.querySelector('.slot-charge-overlay');
-        if (!overlayEl) {
-            overlayEl = document.createElement('div');
-            overlayEl.className = 'slot-charge-overlay';
-            slot1El.appendChild(overlayEl);
+        let chargeOverlayEl = slot1El.querySelector('.slot-charge-overlay');
+        if (!chargeOverlayEl) {
+            chargeOverlayEl = document.createElement('div');
+            chargeOverlayEl.className = 'slot-charge-overlay';
+            slot1El.appendChild(chargeOverlayEl);
+        }
+
+        let cooldownOverlayEl = slot1El.querySelector('.slot-cooldown-overlay');
+        if (!cooldownOverlayEl) {
+            cooldownOverlayEl = document.createElement('div');
+            cooldownOverlayEl.className = 'slot-cooldown-overlay';
+            slot1El.appendChild(cooldownOverlayEl);
         }
 
         if (isBareHandsCharging) {
+            cooldownOverlayEl.style.height = '0%';
             const pct = Math.min(100, (chargeHoldTimer / 0.5) * 100);
-            overlayEl.style.height = `${pct}%`;
+            chargeOverlayEl.style.height = `${pct}%`;
             if (pct >= 100) {
-                overlayEl.classList.add('charged-ready');
+                chargeOverlayEl.classList.add('charged-ready');
             } else {
-                overlayEl.classList.remove('charged-ready');
+                chargeOverlayEl.classList.remove('charged-ready');
             }
+        } else if (attackCooldownTimer > 0) {
+            chargeOverlayEl.style.height = '0%';
+            chargeOverlayEl.classList.remove('charged-ready');
+            // Cooldown overlay drains from TOP to BOTTOM
+            const cdPct = Math.min(100, (attackCooldownTimer / maxAttackCooldownDuration) * 100);
+            cooldownOverlayEl.style.height = `${cdPct}%`;
         } else {
-            overlayEl.style.height = '0%';
-            overlayEl.classList.remove('charged-ready');
+            chargeOverlayEl.style.height = '0%';
+            chargeOverlayEl.classList.remove('charged-ready');
+            cooldownOverlayEl.style.height = '0%';
         }
     }
 
@@ -366,10 +383,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Attack Cooldown Update
+        // Attack Cooldown Timer Update
         if (attackCooldownTimer > 0) {
             attackCooldownTimer -= 1 / 60;
             if (attackCooldownTimer < 0) attackCooldownTimer = 0;
+            updateSlot1ChargeOverlay();
         }
 
         // Charge Timer Update

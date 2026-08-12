@@ -586,13 +586,28 @@ body {
     background: linear-gradient(0deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.4));
     pointer-events: none;
     z-index: 2;
-    transition: height 0.04s linear;
+    transition: height 0.03s linear;
 }
 
 .slot-charge-overlay.charged-ready {
     background: rgba(255, 255, 255, 0.95);
     box-shadow: 0 0 20px rgba(255, 255, 255, 1);
     animation: chargePulse 0.3s infinite alternate;
+}
+
+/* Hotbar Attack Cooldown Overlay (Drains Top to Bottom) */
+.slot-cooldown-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 0%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.35));
+    border-bottom: 2px solid #ffffff;
+    box-shadow: 0 3px 10px rgba(255, 255, 255, 0.6);
+    pointer-events: none;
+    z-index: 3;
+    transition: height 0.03s linear;
 }
 
 @keyframes chargePulse {
