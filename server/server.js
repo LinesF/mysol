@@ -5,7 +5,7 @@ const cors = require('cors');
 const path = require('path');
 const WebSocket = require('ws');
 const authRoutes = require('./routes/auth');
-const GameRoom = require('./rooms/GameRoom');
+const { GameRoom } = require('./rooms/GameRoom');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -33,35 +33,110 @@ app.get('/api/status', (req, res) => {
 // Create HTTP Server & WebSocket Instance
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-const gameRoom = new GameRoom();
+const roomManager = new GameRoom();
 
 // WebSocket Connection Lifecycle
 wss.on('connection', (ws) => {
     const socketId = Math.random().toString(36).substring(2, 9);
-    let playerState = null;
+    ws.socketId = socketId;
+    let currentUserData = null;
 
     ws.on('message', (message) => {
         try {
             const data = JSON.parse(message);
 
-            if (data.type === 'JOIN_ROOM') {
-                playerState = gameRoom.addPlayer(socketId, data.userData || {});
-                ws.send(JSON.stringify({ type: 'ROOM_JOINED', id: socketId, player: playerState }));
-                broadcastGameState();
-            } else if (data.type === 'UPDATE_STATE') {
-                if (playerState) {
-                    gameRoom.updatePlayerState(socketId, data.state);
-                    broadcastGameState();
+            if (data.type === 'GET_ROOM_LIST') {
+                ws.send(JSON.stringify({
+                    type: 'PUBLIC_ROOM_LIST',
+                    rooms: roomManager.getPublicRooms()
+                }));
+            } else if (data.type === 'CREATE_ROOM') {
+                currentUserData = data.userData || { username: 'Player' };
+                const room = roomManager.createRoom(
+                    socketId,
+                    currentUserData,
+                    data.name,
+                    data.isPrivate,
+                    data.password
+                );
+
+                ws.send(JSON.stringify({
+                    type: 'ROOM_JOINED',
+                    id: socketId,
+                    roomInfo: room.getInfo()
+                }));
+                broadcastRoomState(room);
+
+            } else if (data.type === 'JOIN_ROOM_BY_CODE') {
+                currentUserData = data.userData || { username: 'Player' };
+                const result = roomManager.joinRoomByCode(
+                    socketId,
+                    currentUserData,
+                    data.code,
+                    data.password
+                );
+
+                if (result.success) {
+                    ws.send(JSON.stringify({
+                        type: 'ROOM_JOINED',
+                        id: socketId,
+                        roomInfo: result.room.getInfo()
+                    }));
+                    broadcastRoomState(result.room);
+                } else {
+                    ws.send(JSON.stringify({
+                        type: 'ROOM_ERROR',
+                        message: result.message
+                    }));
                 }
+
+            } else if (data.type === 'QUICK_JOIN') {
+                currentUserData = data.userData || { username: 'Player' };
+                const result = roomManager.quickJoin(socketId, currentUserData);
+
+                if (result.success) {
+                    ws.send(JSON.stringify({
+                        type: 'ROOM_JOINED',
+                        id: socketId,
+                        roomInfo: result.room.getInfo()
+                    }));
+                    broadcastRoomState(result.room);
+                } else {
+                    ws.send(JSON.stringify({
+                        type: 'ROOM_ERROR',
+                        message: result.message
+                    }));
+                }
+
+            } else if (data.type === 'LEAVE_ROOM') {
+                const roomCode = roomManager.leaveRoom(socketId);
+                ws.send(JSON.stringify({ type: 'ROOM_LEFT' }));
+                if (roomCode) {
+                    const room = roomManager.rooms.get(roomCode);
+                    if (room) broadcastRoomState(room);
+                }
+
+            } else if (data.type === 'UPDATE_STATE') {
+                const room = roomManager.getPlayerRoom(socketId);
+                if (room) {
+                    const player = room.players.get(socketId);
+                    if (player) {
+                        Object.assign(player, data.state);
+                        broadcastRoomState(room);
+                    }
+                }
+
             } else if (data.type === 'CHAT_MESSAGE') {
-                if (playerState) {
-                    gameRoom.updatePlayerState(socketId, {
-                        speechBubble: {
+                const room = roomManager.getPlayerRoom(socketId);
+                if (room) {
+                    const player = room.players.get(socketId);
+                    if (player) {
+                        player.speechBubble = {
                             text: data.text,
                             expiresAt: Date.now() + 5000
-                        }
-                    });
-                    broadcastGameState();
+                        };
+                        broadcastRoomState(room);
+                    }
                 }
             }
         } catch (err) {
@@ -70,17 +145,26 @@ wss.on('connection', (ws) => {
     });
 
     ws.on('close', () => {
-        gameRoom.removePlayer(socketId);
-        broadcastGameState();
+        const roomCode = roomManager.leaveRoom(socketId);
+        if (roomCode) {
+            const room = roomManager.rooms.get(roomCode);
+            if (room) broadcastRoomState(room);
+        }
     });
 });
 
-function broadcastGameState() {
-    const snapshot = gameRoom.getSnapshot();
-    const payload = JSON.stringify({ type: 'GAME_STATE', players: snapshot });
+function broadcastRoomState(room) {
+    if (!room) return;
+    const snapshot = room.getSnapshot();
+    const info = room.getInfo();
+    const payload = JSON.stringify({
+        type: 'GAME_STATE',
+        roomInfo: info,
+        players: snapshot
+    });
 
     wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
+        if (client.readyState === WebSocket.OPEN && room.players.has(client.socketId)) {
             client.send(payload);
         }
     });

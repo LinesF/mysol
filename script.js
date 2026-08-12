@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 31: Real-Time Password Mismatch & Login Error Red Border Visual Feedback
+// mysol 2D Pixel Game Engine - Step 32: Smartphone Room Creation & Join UI with WebSocket Multi-Room Sync
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -49,10 +49,47 @@ document.addEventListener('DOMContentLoaded', () => {
     const staminaBarValEl = document.getElementById('stamina-bar-val');
     const phoneScreenContainerEl = document.getElementById('phone-screen-container');
 
+    // Smartphone Views & Navigation DOM Elements
+    const phoneViewMainEl = document.getElementById('phone-view-main');
+    const phoneViewCreateEl = document.getElementById('phone-view-create');
+    const phoneViewJoinEl = document.getElementById('phone-view-join');
+    const phoneViewRoomInfoEl = document.getElementById('phone-view-room-info');
+
+    const btnPhoneCreateRoomEl = document.getElementById('btn-phone-create-room');
+    const btnPhoneJoinRoomEl = document.getElementById('btn-phone-join-room');
+    const btnPhoneQuickStartEl = document.getElementById('btn-phone-quick-start');
+    const btnPhoneBackCreateEl = document.getElementById('btn-phone-back-create');
+    const btnPhoneBackJoinEl = document.getElementById('btn-phone-back-join');
+
+    const createRoomNameEl = document.getElementById('create-room-name');
+    const btnTypePublicEl = document.getElementById('btn-type-public');
+    const btnTypePrivateEl = document.getElementById('btn-type-private');
+    const phonePassGroupEl = document.getElementById('phone-pass-group');
+    const createRoomPasswordEl = document.getElementById('create-room-password');
+    const btnSubmitCreateRoomEl = document.getElementById('btn-submit-create-room');
+
+    const tabJoinPublicEl = document.getElementById('tab-join-public');
+    const tabJoinPrivateEl = document.getElementById('tab-join-private');
+    const phoneJoinPublicSecEl = document.getElementById('phone-join-public-sec');
+    const phoneJoinPrivateSecEl = document.getElementById('phone-join-private-sec');
+    const publicRoomListEl = document.getElementById('public-room-list');
+    const joinRoomCodeEl = document.getElementById('join-room-code');
+    const joinRoomPassEl = document.getElementById('join-room-pass');
+    const btnSubmitJoinPrivateEl = document.getElementById('btn-submit-join-private');
+
+    const infoRoomNameEl = document.getElementById('info-room-name');
+    const infoRoomCodeEl = document.getElementById('info-room-code');
+    const infoRoomPassEl = document.getElementById('info-room-pass');
+    const infoRoomCountEl = document.getElementById('info-room-count');
+    const roomPlayerBadgesEl = document.getElementById('room-player-badges');
+    const btnPhoneLeaveRoomEl = document.getElementById('btn-phone-leave-room');
+
     const API_BASE = 'http://localhost:3000';
     let ws = null;
     let localSocketId = null;
     let remotePlayers = [];
+    let activeRoomInfo = null;
+    let isCreatingPrivate = false;
 
     // -------------------------------------------------------------
     // AUTH & BACKEND REST API INTEGRATION
@@ -102,14 +139,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    if (signupPasswordEl) {
-        signupPasswordEl.addEventListener('input', validatePasswordConfirmMatch);
-    }
-    if (signupPasswordConfirmEl) {
-        signupPasswordConfirmEl.addEventListener('input', validatePasswordConfirmMatch);
-    }
+    if (signupPasswordEl) signupPasswordEl.addEventListener('input', validatePasswordConfirmMatch);
+    if (signupPasswordConfirmEl) signupPasswordConfirmEl.addEventListener('input', validatePasswordConfirmMatch);
 
-    // Login Input Error Reset on User Typing
     if (loginEmailEl) {
         loginEmailEl.addEventListener('input', () => {
             loginEmailEl.classList.remove('input-error');
@@ -144,7 +176,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (signupCodeEl) signupCodeEl.disabled = false;
     }
 
-    // Reset countdown if user modifies email address
     if (signupEmailEl) {
         signupEmailEl.addEventListener('input', () => {
             const currentEmail = signupEmailEl.value.trim();
@@ -191,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1000);
     }
 
-    // 1. Dispatch Verification Code API Call & 60s Countdown
+    // Dispatch Verification Code
     if (btnSendCodeEl) {
         btnSendCodeEl.addEventListener('click', async () => {
             const rawEmail = (signupEmailEl ? signupEmailEl.value : '').trim();
@@ -230,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 1.5. Check Verification Code API Call [확인 버튼]
+    // Check Verification Code
     if (btnVerifyCodeEl) {
         btnVerifyCodeEl.addEventListener('click', async () => {
             const rawEmail = (signupEmailEl ? signupEmailEl.value : '').trim();
@@ -277,7 +308,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     showFlashlightToast(`⚠️ ${data.message}`);
                 }
             } catch (err) {
-                // Strict Local Verification Match Check
                 if (latestGeneratedCode && code === latestGeneratedCode) {
                     isEmailVerified = true;
                     resetVerificationTimer();
@@ -303,7 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 2. Submit Sign Up (Account Creation API)
+    // Submit Sign Up
     if (btnSignupSubmitEl) {
         btnSignupSubmitEl.addEventListener('click', async () => {
             const rawEmail = (signupEmailEl ? signupEmailEl.value : '').trim();
@@ -357,7 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 3. Submit Email Login API (With Red Border Error Feedback)
+    // Submit Email Login
     if (btnLoginSubmitEl) {
         btnLoginSubmitEl.addEventListener('click', async () => {
             const rawEmail = (loginEmailEl ? loginEmailEl.value : '').trim();
@@ -396,7 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 4. Google Account Login
+    // Google Account Login
     if (btnGoogleLoginEl) {
         btnGoogleLoginEl.addEventListener('click', () => {
             const googleUsername = 'Google_User';
@@ -409,7 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 5. Guest Mode Start
+    // Guest Mode Start
     if (btnGuestStartEl) {
         btnGuestStartEl.addEventListener('click', () => {
             const guestId = `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
@@ -437,7 +467,9 @@ document.addEventListener('DOMContentLoaded', () => {
         connectWebSocket(userData);
     }
 
-    // Connect to WebSocket Server for Real-Time Multiplayer Sync
+    // -------------------------------------------------------------
+    // WEBSOCKET MULTI-ROOM EVENT HANDLERS
+    // -------------------------------------------------------------
     function connectWebSocket(userData) {
         try {
             const wsUrl = `ws://${location.hostname || 'localhost'}:3000`;
@@ -445,19 +477,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
             ws.onopen = () => {
                 console.log('[WEBSOCKET] Connected to server');
-                ws.send(JSON.stringify({ type: 'JOIN_ROOM', userData }));
             };
 
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
+
                     if (data.type === 'ROOM_JOINED') {
                         localSocketId = data.id;
-                        console.log(`[WEBSOCKET] Room joined, Local Socket ID: ${localSocketId}`);
+                        activeRoomInfo = data.roomInfo;
+                        showPhoneView('room-info');
+                        updateActiveRoomInfoUI(activeRoomInfo);
+                        showFlashlightToast(`🏠 방에 입장했습니다: [${activeRoomInfo.code}]`);
+                    } else if (data.type === 'ROOM_LEFT') {
+                        activeRoomInfo = null;
+                        remotePlayers = [];
+                        showPhoneView('main');
+                        showFlashlightToast('🚪 방에서 퇴장했습니다.');
                     } else if (data.type === 'GAME_STATE') {
-                        remotePlayers = data.players.filter(p => p.id !== localSocketId);
+                        if (data.roomInfo) {
+                            activeRoomInfo = data.roomInfo;
+                            updateActiveRoomInfoUI(activeRoomInfo);
+                        }
+                        remotePlayers = (data.players || []).filter(p => p.id !== localSocketId);
+                    } else if (data.type === 'PUBLIC_ROOM_LIST') {
+                        renderPublicRoomList(data.rooms || []);
+                    } else if (data.type === 'ROOM_ERROR') {
+                        showFlashlightToast(`⚠️ ${data.message}`);
                     }
-                } catch (e) {}
+                } catch (e) {
+                    console.error('WS message parse error:', e);
+                }
             };
 
             ws.onclose = () => {
@@ -466,6 +516,216 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) {
             console.error('WebSocket connection error:', e);
         }
+    }
+
+    // -------------------------------------------------------------
+    // SMARTPHONE VIEWS SWITCHING & UI LOGIC
+    // -------------------------------------------------------------
+    function showPhoneView(viewName) {
+        if (phoneViewMainEl) phoneViewMainEl.classList.add('hidden');
+        if (phoneViewCreateEl) phoneViewCreateEl.classList.add('hidden');
+        if (phoneViewJoinEl) phoneViewJoinEl.classList.add('hidden');
+        if (phoneViewRoomInfoEl) phoneViewRoomInfoEl.classList.add('hidden');
+
+        if (viewName === 'main' && phoneViewMainEl) {
+            if (activeRoomInfo) {
+                showPhoneView('room-info');
+            } else {
+                phoneViewMainEl.classList.remove('hidden');
+            }
+        } else if (viewName === 'create' && phoneViewCreateEl) {
+            phoneViewCreateEl.classList.remove('hidden');
+        } else if (viewName === 'join' && phoneViewJoinEl) {
+            phoneViewJoinEl.classList.remove('hidden');
+        } else if (viewName === 'room-info' && phoneViewRoomInfoEl) {
+            phoneViewRoomInfoEl.classList.remove('hidden');
+        }
+    }
+
+    // Main Menu Buttons
+    if (btnPhoneCreateRoomEl) {
+        btnPhoneCreateRoomEl.addEventListener('click', () => {
+            showPhoneView('create');
+        });
+    }
+
+    if (btnPhoneJoinRoomEl) {
+        btnPhoneJoinRoomEl.addEventListener('click', () => {
+            showPhoneView('join');
+            fetchPublicRoomList();
+        });
+    }
+
+    if (btnPhoneQuickStartEl) {
+        btnPhoneQuickStartEl.addEventListener('click', () => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                showFlashlightToast('⚠️ 서버에 연결되어 있지 않습니다.');
+                return;
+            }
+            ws.send(JSON.stringify({ type: 'QUICK_JOIN', userData: currentUser }));
+        });
+    }
+
+    if (btnPhoneBackCreateEl) {
+        btnPhoneBackCreateEl.addEventListener('click', () => showPhoneView('main'));
+    }
+
+    if (btnPhoneBackJoinEl) {
+        btnPhoneBackJoinEl.addEventListener('click', () => showPhoneView('main'));
+    }
+
+    // Room Creation Toggle (Public vs Private)
+    if (btnTypePublicEl && btnTypePrivateEl) {
+        btnTypePublicEl.addEventListener('click', () => {
+            isCreatingPrivate = false;
+            btnTypePublicEl.classList.add('active');
+            btnTypePrivateEl.classList.remove('active');
+            if (phonePassGroupEl) phonePassGroupEl.classList.add('hidden');
+        });
+
+        btnTypePrivateEl.addEventListener('click', () => {
+            isCreatingPrivate = true;
+            btnTypePrivateEl.classList.add('active');
+            btnTypePublicEl.classList.remove('active');
+            if (phonePassGroupEl) phonePassGroupEl.classList.remove('hidden');
+        });
+    }
+
+    if (btnSubmitCreateRoomEl) {
+        btnSubmitCreateRoomEl.addEventListener('click', () => {
+            const name = (createRoomNameEl ? createRoomNameEl.value : '').trim() || '생존자의 방';
+            const password = (createRoomPasswordEl ? createRoomPasswordEl.value : '').trim();
+
+            if (isCreatingPrivate && (!password || password.length < 4)) {
+                showFlashlightToast('⚠️ 비공개 방은 4자리 비밀번호를 입력해 주세요.');
+                return;
+            }
+
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                showFlashlightToast('⚠️ 서버에 연결되어 있지 않습니다.');
+                return;
+            }
+
+            ws.send(JSON.stringify({
+                type: 'CREATE_ROOM',
+                userData: currentUser,
+                name: name,
+                isPrivate: isCreatingPrivate,
+                password: password
+            }));
+        });
+    }
+
+    // Room Join Tabs (Public List vs Private Code Input)
+    if (tabJoinPublicEl && tabJoinPrivateEl) {
+        tabJoinPublicEl.addEventListener('click', () => {
+            tabJoinPublicEl.classList.add('active');
+            tabJoinPrivateEl.classList.remove('active');
+            if (phoneJoinPublicSecEl) phoneJoinPublicSecEl.classList.remove('hidden');
+            if (phoneJoinPrivateSecEl) phoneJoinPrivateSecEl.classList.add('hidden');
+            fetchPublicRoomList();
+        });
+
+        tabJoinPrivateEl.addEventListener('click', () => {
+            tabJoinPrivateEl.classList.add('active');
+            tabJoinPublicEl.classList.remove('active');
+            if (phoneJoinPrivateSecEl) phoneJoinPrivateSecEl.classList.remove('hidden');
+            if (phoneJoinPublicSecEl) phoneJoinPublicSecEl.classList.add('hidden');
+        });
+    }
+
+    function fetchPublicRoomList() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'GET_ROOM_LIST' }));
+        }
+    }
+
+    function renderPublicRoomList(rooms) {
+        if (!publicRoomListEl) return;
+        publicRoomListEl.innerHTML = '';
+
+        if (!rooms || rooms.length === 0) {
+            publicRoomListEl.innerHTML = '<div class="room-empty-tip">열려있는 공개 방이 없습니다.</div>';
+            return;
+        }
+
+        rooms.forEach(r => {
+            const card = document.createElement('div');
+            card.className = 'room-item-card';
+            card.innerHTML = `
+                <div class="room-card-info">
+                    <div class="room-card-title">${r.name}</div>
+                    <div class="room-card-code">${r.code}</div>
+                </div>
+                <div class="room-card-count">👥 ${r.playerCount}/${r.maxPlayers}</div>
+            `;
+
+            card.addEventListener('click', () => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'JOIN_ROOM_BY_CODE',
+                        userData: currentUser,
+                        code: r.code
+                    }));
+                }
+            });
+
+            publicRoomListEl.appendChild(card);
+        });
+    }
+
+    if (btnSubmitJoinPrivateEl) {
+        btnSubmitJoinPrivateEl.addEventListener('click', () => {
+            const code = (joinRoomCodeEl ? joinRoomCodeEl.value : '').trim();
+            const password = (joinRoomPassEl ? joinRoomPassEl.value : '').trim();
+
+            if (!code) {
+                showFlashlightToast('⚠️ 방 번호를 입력해 주세요.');
+                return;
+            }
+
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                showFlashlightToast('⚠️ 서버에 연결되어 있지 않습니다.');
+                return;
+            }
+
+            ws.send(JSON.stringify({
+                type: 'JOIN_ROOM_BY_CODE',
+                userData: currentUser,
+                code: code,
+                password: password
+            }));
+        });
+    }
+
+    // Active Room Info UI Update
+    function updateActiveRoomInfoUI(info) {
+        if (!info) return;
+        if (infoRoomNameEl) infoRoomNameEl.textContent = info.name || 'MY ROOM';
+        if (infoRoomCodeEl) infoRoomCodeEl.textContent = info.code || '#0000';
+        if (infoRoomPassEl) infoRoomPassEl.textContent = info.isPrivate ? `🔒 ${info.password}` : '🌐 공개 방';
+        if (infoRoomCountEl) infoRoomCountEl.textContent = `${info.playerCount} / ${info.maxPlayers} 명`;
+
+        if (roomPlayerBadgesEl) {
+            roomPlayerBadgesEl.innerHTML = '';
+            (info.players || []).forEach(p => {
+                const badge = document.createElement('div');
+                badge.className = 'player-badge-item';
+                badge.innerHTML = `
+                    <span>${p.isHost ? '👑' : '👤'}</span>
+                    <span>${p.username}</span>
+                `;
+                roomPlayerBadgesEl.appendChild(badge);
+            });
+        }
+    }
+
+    if (btnPhoneLeaveRoomEl) {
+        btnPhoneLeaveRoomEl.addEventListener('click', () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'LEAVE_ROOM' }));
+            }
+        });
     }
 
     function sendPlayerStateUpdate() {
@@ -501,13 +761,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // -------------------------------------------------------------
-    // OFFSCREEN CANVAS FOR LIGHTING & DARKNESS MASKING
-    // -------------------------------------------------------------
+    // Offscreen Canvas
     const maskCanvas = document.createElement('canvas');
     const maskCtx = maskCanvas.getContext('2d');
 
-    // Canvas & 10x10 Expanded Map Parameters
     let width = 800;
     let height = 600;
 
@@ -515,7 +772,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const TILE_SIZE = 80;
     const MAP_DIM = GRID_SIZE * TILE_SIZE;
 
-    // Mouse Tracking
     let mouseX = width / 2;
     let mouseY = height / 2;
 
@@ -533,7 +789,6 @@ document.addEventListener('DOMContentLoaded', () => {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Player Position & Movement Parameters
     const NORMAL_SPEED = 3.5;
     const SPRINT_SPEED = 6.0;
     const DASH_SPEED = 20.0;
@@ -550,41 +805,35 @@ document.addEventListener('DOMContentLoaded', () => {
         animTimer: 0
     };
 
-    // Campfire Position
     const campfire = {
         x: MAP_DIM / 2,
         y: MAP_DIM / 2,
         flickerTimer: 0
     };
 
-    // Camera Management
     let isCameraLocked = true;
     const cameraPanOffset = { x: 0, y: 0 };
     const MAX_CAM_PAN_TILES = 10;
     const MAX_CAM_PAN = MAX_CAM_PAN_TILES * TILE_SIZE;
     const CAM_PAN_SPEED = 7.0;
 
-    // Flashlight & Battery System
     let isFlashlightOn = false;
     let battery = 100.0;
     let flashlightToastTimeout = null;
     let warningToastTimeout = null;
 
-    // Advanced Stamina & Exhaustion System
     let stamina = 100.0;
     let isExhausted = false;
     let staminaRegenDelayTimer = 0.0;
     let exhaustionTimer = 0.0;
     let lowestStaminaReached = 100.0;
 
-    // Space Key Quick Dash System
     let isDashing = false;
     let dashTimer = 0.0;
     let dashCooldownTimer = 0.0;
     const dashVector = { x: 0, y: 0 };
     let dashGhostPositions = [];
 
-    // Bare Hands Combat & Cooldown System
     let isBareHandsCharging = false;
     let chargeHoldTimer = 0.0;
     let attackCooldownTimer = 0.0;
@@ -672,7 +921,6 @@ document.addEventListener('DOMContentLoaded', () => {
         sendPlayerStateUpdate();
     }
 
-    // Toggle Offhand Item Ability (CapsLock Key)
     function toggleOffhandAbility() {
         const offhandItem = equipment[4];
         if (!offhandItem) {
@@ -696,9 +944,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // -------------------------------------------------------------
-    // SPACE KEY QUICK DASH EXECUTION
-    // -------------------------------------------------------------
     function triggerQuickDash() {
         if (isDashing || dashCooldownTimer > 0) return;
         if (isExhausted || stamina < 10.0) return;
@@ -749,9 +994,6 @@ document.addEventListener('DOMContentLoaded', () => {
         sendPlayerStateUpdate();
     }
 
-    // -------------------------------------------------------------
-    // BARE HANDS ATTACK & CHARGE LOGIC
-    // -------------------------------------------------------------
     function startBareHandsCharge() {
         const equipped = hotbar[activeHotbarIndex];
         if (!equipped || equipped.id !== 'hands') return;
@@ -820,7 +1062,6 @@ document.addEventListener('DOMContentLoaded', () => {
         sendPlayerStateUpdate();
     }
 
-    // Mouse Right Click Event Handlers
     window.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         const equippedMain = hotbar[activeHotbarIndex];
@@ -989,13 +1230,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Dash Cooldown Update
         if (dashCooldownTimer > 0) {
             dashCooldownTimer -= 1 / 60;
             if (dashCooldownTimer < 0) dashCooldownTimer = 0;
         }
 
-        // Dash Movement Logic
         if (isDashing) {
             dashTimer -= 1 / 60;
             
@@ -1019,20 +1258,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         dashGhostPositions = dashGhostPositions.filter(ghost => ghost.alpha > 0);
 
-        // Attack Cooldown Timer Update
         if (attackCooldownTimer > 0) {
             attackCooldownTimer -= 1 / 60;
             if (attackCooldownTimer < 0) attackCooldownTimer = 0;
             updateSlot1ChargeOverlay();
         }
 
-        // Charge Timer Update
         if (isBareHandsCharging) {
             chargeHoldTimer += 1 / 60;
             updateSlot1ChargeOverlay();
         }
 
-        // Active Attack Animation Timer
         if (activeAttackAnimation) {
             activeAttackAnimation.remainingTime -= 1 / 60;
             if (activeAttackAnimation.remainingTime <= 0) {
@@ -1040,7 +1276,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Hand-crank Generator Battery Recharge Logic
         const isMainGeneratorEquipped = hotbar[activeHotbarIndex] && hotbar[activeHotbarIndex].id === 'generator';
         const isOffhandGeneratorEquipped = equipment[4] && equipment[4].id === 'generator';
         const hasGeneratorEquipped = isMainGeneratorEquipped || isOffhandGeneratorEquipped;
@@ -1074,7 +1309,6 @@ document.addEventListener('DOMContentLoaded', () => {
             batteryBarValEl.textContent = Math.round(battery);
         }
 
-        // WASD Movement & Sprint Logic
         let isWASD = false;
         let dx = 0;
         let dy = 0;
@@ -1119,7 +1353,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const isShiftPressed = keys['shift'] || keys['Shift'] || keys['shiftleft'] || keys['shiftright'];
         player.isMoving = isWASD && (dx !== 0 || dy !== 0);
 
-        // Sprint Execution Logic
         const canSprint = player.isMoving && isShiftPressed && !isExhausted && stamina > 0 && !isDashing;
 
         if (canSprint) {
@@ -1151,7 +1384,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 player.speed = NORMAL_SPEED;
             }
 
-            // Update Exhaustion Timer
             if (isExhausted) {
                 exhaustionTimer -= 1 / 60;
                 if (exhaustionTimer <= 0 && stamina >= 25.0) {
@@ -1159,7 +1391,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // Update Stamina Regen Delay Timer
             if (staminaRegenDelayTimer > 0) {
                 staminaRegenDelayTimer -= 1 / 60;
             } else {
@@ -1180,7 +1411,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Update Orange Stamina Bar HUD Element & Visual Exhausted Style
         if (staminaBarFillEl) {
             staminaBarFillEl.style.width = `${Math.max(0, Math.min(100, stamina))}%`;
             if (isExhausted) {
@@ -1193,7 +1423,6 @@ document.addEventListener('DOMContentLoaded', () => {
             staminaBarValEl.textContent = Math.round(stamina);
         }
 
-        // Move Player Position
         if (player.isMoving && !isDashing) {
             if (dx !== 0 && dy !== 0) {
                 dx *= 0.7071;
@@ -1627,7 +1856,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             maskCtx.globalCompositeOperation = 'destination-out';
 
-            // Light Source 1: Player Base Ambient Light
             const playerGrad = maskCtx.createRadialGradient(px, py, 10, px, py, playerBaseRadius);
             playerGrad.addColorStop(0, 'rgba(0, 0, 0, 0.85)');
             playerGrad.addColorStop(0.6, 'rgba(0, 0, 0, 0.35)');
@@ -1638,7 +1866,6 @@ document.addEventListener('DOMContentLoaded', () => {
             maskCtx.arc(px, py, playerBaseRadius, 0, Math.PI * 2);
             maskCtx.fill();
 
-            // Light Source 2: Center Campfire
             const fireGrad = maskCtx.createRadialGradient(cx, cy, 15, cx, cy, campfireLightRadius);
             fireGrad.addColorStop(0, 'rgba(0, 0, 0, 0.92)');
             fireGrad.addColorStop(0.48, 'rgba(0, 0, 0, 0.5)');
@@ -1650,7 +1877,6 @@ document.addEventListener('DOMContentLoaded', () => {
             maskCtx.arc(cx, cy, campfireLightRadius, 0, Math.PI * 2);
             maskCtx.fill();
 
-            // Light Source 3: 6-Tile Softened Flashlight Sector Beam
             if (isFlashlightActive) {
                 const flashDistance = 6 * TILE_SIZE;
                 const flashAngle = Math.atan2(mouseY - py, mouseX - px);
@@ -1674,7 +1900,6 @@ document.addEventListener('DOMContentLoaded', () => {
             maskCtx.globalCompositeOperation = 'source-over';
             ctx.drawImage(maskCanvas, 0, 0);
 
-            // Warm campfire glow
             ctx.save();
             const warmGlow = ctx.createRadialGradient(cx, cy, 10, cx, cy, 260 + flickerRadius);
             warmGlow.addColorStop(0, 'rgba(249, 115, 22, 0.32)');
@@ -1686,7 +1911,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.arc(cx, cy, 260 + flickerRadius, 0, Math.PI * 2);
             ctx.fill();
 
-            // Flashlight Yellow Beam Visual Overlay
             if (isFlashlightActive) {
                 const flashDistance = 6 * TILE_SIZE;
                 const flashAngle = Math.atan2(mouseY - py, mouseX - px);
@@ -1768,9 +1992,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.restore();
     }
 
-    // -------------------------------------------------------------
     // CHAT INPUT LOGIC
-    // -------------------------------------------------------------
     if (chatInputEl && chatCharCountEl) {
         chatInputEl.addEventListener('input', () => {
             if (chatInputEl.value.length > 20) {
@@ -1813,9 +2035,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // -------------------------------------------------------------
     // HOTBAR, INVENTORY & EQUIPMENT SYSTEM
-    // -------------------------------------------------------------
     const ITEMS = {
         HANDS: { id: 'hands', name: '맨손', icon: '✊', locked: true },
         FLASHLIGHT: { id: 'flashlight', name: '후레쉬', icon: '🔦' },

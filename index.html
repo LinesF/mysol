@@ -196,11 +196,125 @@
                             <span>🔋</span>
                         </div>
                     </div>
-                    <!-- Clean White Screen Area -->
+                    <!-- Smartphone Screen Views Container -->
                     <div class="phone-content">
-                        <div class="phone-placeholder">
-                            <span class="phone-icon-big">📱</span>
-                            <span class="phone-title">MY PHONE</span>
+                        <!-- View 1: Main Menu -->
+                        <div id="phone-view-main" class="phone-view">
+                            <div class="phone-app-header">
+                                <span class="phone-app-icon">📱</span>
+                                <span class="phone-app-title">MULTIPLAYER LOBBY</span>
+                            </div>
+                            <div class="phone-menu-list">
+                                <button id="btn-phone-create-room" class="phone-menu-btn create-btn">
+                                    <span class="btn-icon">🔨</span>
+                                    <div class="btn-text-group">
+                                        <span class="btn-title">방 생성</span>
+                                        <span class="btn-desc">공개/비공개 멀티 방 만들기</span>
+                                    </div>
+                                </button>
+                                <button id="btn-phone-join-room" class="phone-menu-btn join-btn">
+                                    <span class="btn-icon">🚪</span>
+                                    <div class="btn-text-group">
+                                        <span class="btn-title">방 참가</span>
+                                        <span class="btn-desc">공개 목록 & 비공개 방 코드</span>
+                                    </div>
+                                </button>
+                                <button id="btn-phone-quick-start" class="phone-menu-btn quick-btn">
+                                    <span class="btn-icon">⚡</span>
+                                    <div class="btn-text-group">
+                                        <span class="btn-title">빠른 시작</span>
+                                        <span class="btn-desc">즉시 게임 방 랜덤 입장</span>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- View 2: Room Creation Form -->
+                        <div id="phone-view-create" class="phone-view hidden">
+                            <div class="phone-nav-bar">
+                                <button id="btn-phone-back-create" class="phone-back-btn">‹</button>
+                                <span class="phone-nav-title">🔨 방 생성 설정</span>
+                            </div>
+                            <div class="phone-form-body">
+                                <div class="phone-input-group">
+                                    <label>방 이름</label>
+                                    <input type="text" id="create-room-name" placeholder="생성할 방 제목" value="생존자의 방">
+                                </div>
+                                <div class="phone-input-group">
+                                    <label>공개 여부 설정</label>
+                                    <div class="phone-toggle-group">
+                                        <button id="btn-type-public" class="phone-toggle-btn active">🌐 공개</button>
+                                        <button id="btn-type-private" class="phone-toggle-btn">🔒 비공개</button>
+                                    </div>
+                                </div>
+                                <div id="phone-pass-group" class="phone-input-group hidden">
+                                    <label>비밀번호 (숫자 4자리)</label>
+                                    <input type="password" id="create-room-password" placeholder="비밀번호 입력" maxlength="4">
+                                </div>
+                                <button id="btn-submit-create-room" class="phone-action-btn">방 만들기</button>
+                            </div>
+                        </div>
+
+                        <!-- View 3: Room Join List & Private Modal -->
+                        <div id="phone-view-join" class="phone-view hidden">
+                            <div class="phone-nav-bar">
+                                <button id="btn-phone-back-join" class="phone-back-btn">‹</button>
+                                <span class="phone-nav-title">🚪 방 참가</span>
+                            </div>
+                            <!-- Tab Header (Public List vs Private Code Join) -->
+                            <div class="phone-sub-tabs">
+                                <button id="tab-join-public" class="phone-sub-tab-btn active">공개 방 목록</button>
+                                <button id="tab-join-private" class="phone-sub-tab-btn">🔒 비공개 방</button>
+                            </div>
+                            
+                            <!-- Public Room List -->
+                            <div id="phone-join-public-sec" class="phone-join-section">
+                                <div id="public-room-list" class="public-room-list">
+                                    <div class="room-empty-tip">열려있는 공개 방이 없습니다.</div>
+                                </div>
+                            </div>
+
+                            <!-- Private Room Join Form -->
+                            <div id="phone-join-private-sec" class="phone-join-section hidden">
+                                <div class="phone-input-group">
+                                    <label>방 번호 (예: #8492)</label>
+                                    <input type="text" id="join-room-code" placeholder="방 번호 4자리" maxlength="6">
+                                </div>
+                                <div class="phone-input-group">
+                                    <label>비밀번호</label>
+                                    <input type="password" id="join-room-pass" placeholder="비밀번호 4자리" maxlength="4">
+                                </div>
+                                <button id="btn-submit-join-private" class="phone-action-btn">입장하기</button>
+                            </div>
+                        </div>
+
+                        <!-- View 4: Active Room Info (Inside Room) -->
+                        <div id="phone-view-room-info" class="phone-view hidden">
+                            <div class="phone-app-header room-header">
+                                <span class="phone-app-icon">🏠</span>
+                                <span id="info-room-name" class="phone-app-title">MY ROOM</span>
+                            </div>
+                            <div class="room-info-card">
+                                <div class="info-row">
+                                    <span class="info-label">방 번호</span>
+                                    <span id="info-room-code" class="info-value gold-text">#0000</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">비밀번호</span>
+                                    <span id="info-room-pass" class="info-value">공개 방</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">현재 인원</span>
+                                    <span id="info-room-count" class="info-value">1 / 4 명</span>
+                                </div>
+                            </div>
+                            <div class="phone-players-list">
+                                <label class="players-title">참여자 목록</label>
+                                <div id="room-player-badges" class="player-badges-container">
+                                    <!-- Player badge items -->
+                                </div>
+                            </div>
+                            <button id="btn-phone-leave-room" class="phone-leave-btn">🚪 방 나가기</button>
                         </div>
                     </div>
                     <div class="phone-home-bar"></div>

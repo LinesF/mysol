@@ -805,13 +805,13 @@ body {
 .phone-screen-body {
     width: 100%;
     height: 100%;
-    background: #ffffff;
+    background: #0f172a;
+    color: #f8fafc;
     border-radius: 22px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     position: relative;
-    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.05);
 }
 
 .phone-status-bar {
@@ -822,7 +822,7 @@ body {
     font-family: var(--font-code);
     font-size: 0.68rem;
     font-weight: 700;
-    color: #1e293b;
+    color: #94a3b8;
     z-index: 5;
 }
 
@@ -836,30 +836,356 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 12px;
-    background: #ffffff;
+    padding: 10px;
+    background: #0f172a;
+    overflow-y: auto;
 }
 
-.phone-placeholder {
+.phone-view {
     display: flex;
     flex-direction: column;
+    height: 100%;
+    width: 100%;
+    gap: 10px;
+}
+
+.phone-view.hidden {
+    display: none !important;
+}
+
+/* Smartphone App Headers & Navigation */
+.phone-app-header {
+    display: flex;
     align-items: center;
     gap: 8px;
-    color: #64748b;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.phone-icon-big {
-    font-size: 3.2rem;
+.phone-app-icon {
+    font-size: 1.2rem;
 }
 
-.phone-title {
+.phone-app-title {
     font-family: var(--font-heading);
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     font-weight: 800;
-    color: #0f172a;
+    color: var(--slot-active);
     letter-spacing: 0.5px;
+}
+
+.phone-nav-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.phone-back-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.phone-back-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.phone-nav-title {
+    font-family: var(--font-heading);
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+/* Smartphone Menu Buttons Stack */
+.phone-menu-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.phone-menu-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px;
+    background: rgba(30, 41, 59, 0.8);
+    border: 1.5px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    color: #ffffff;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s ease;
+}
+
+.phone-menu-btn:hover {
+    transform: translateY(-2px);
+    border-color: var(--slot-active);
+    box-shadow: 0 6px 16px rgba(56, 189, 248, 0.2);
+}
+
+.phone-menu-btn .btn-icon {
+    font-size: 1.5rem;
+}
+
+.btn-text-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.btn-text-group .btn-title {
+    font-family: var(--font-heading);
+    font-size: 0.88rem;
+    font-weight: 800;
+}
+
+.btn-text-group .btn-desc {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+
+/* Form Inputs & Toggles inside Smartphone */
+.phone-form-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.phone-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.phone-input-group label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.phone-input-group input {
+    width: 100%;
+    height: 36px;
+    background: rgba(30, 41, 59, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    padding: 0 10px;
+    color: #ffffff;
+    font-size: 0.78rem;
+    outline: none;
+}
+
+.phone-toggle-group {
+    display: flex;
+    gap: 6px;
+}
+
+.phone-toggle-btn {
+    flex: 1;
+    height: 34px;
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.phone-toggle-btn.active {
+    background: var(--slot-active);
+    color: #0f172a;
+    border-color: var(--slot-active);
+}
+
+.phone-action-btn {
+    width: 100%;
+    height: 38px;
+    background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 12px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 6px;
+}
+
+.phone-action-btn:hover {
+    opacity: 0.9;
+}
+
+/* Sub-tabs for Room Join */
+.phone-sub-tabs {
+    display: flex;
+    gap: 4px;
+    background: rgba(30, 41, 59, 0.8);
+    border-radius: 10px;
+    padding: 3px;
+}
+
+.phone-sub-tab-btn {
+    flex: 1;
+    height: 28px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.phone-sub-tab-btn.active {
+    background: var(--slot-active);
+    color: #0f172a;
+}
+
+.public-room-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.room-item-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: rgba(30, 41, 59, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.room-item-card:hover {
+    border-color: var(--slot-active);
+    background: rgba(56, 189, 248, 0.15);
+}
+
+.room-card-title {
+    font-family: var(--font-heading);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.room-card-code {
+    font-family: var(--font-code);
+    font-size: 0.65rem;
+    color: var(--accent-gold);
+}
+
+.room-card-count {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.room-empty-tip {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 20px 0;
+}
+
+/* Active Room Info Card */
+.room-info-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: rgba(30, 41, 59, 0.9);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 12px;
+    padding: 10px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+}
+
+.info-label {
+    color: var(--text-muted);
+}
+
+.info-value {
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.info-value.gold-text {
+    color: var(--accent-gold);
+    font-family: var(--font-code);
+}
+
+.phone-players-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+}
+
+.players-title {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.player-badges-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 140px;
+    overflow-y: auto;
+}
+
+.player-badge-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.phone-leave-btn {
+    width: 100%;
+    height: 36px;
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: auto;
+}
+
+.phone-leave-btn:hover {
+    background: #ef4444;
+    color: #ffffff;
 }
 
 .phone-home-bar {
