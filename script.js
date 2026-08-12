@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 16: Sprint / Run System (Shift Key Speed Boost & Orange Stamina Bar Management)
+// mysol 2D Pixel Game Engine - Step 17 Fix: Bind Stamina Bar HUD IDs & Robust Shift Sprint Key Recognition
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -278,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        if (e.key === 'Shift') {
+        if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.shiftKey) {
             keys['shift'] = true;
         }
 
@@ -326,7 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.addEventListener('keyup', (e) => {
-        if (e.key === 'Shift') {
+        if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
             keys['shift'] = false;
         }
 
@@ -487,16 +487,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        const isShiftPressed = keys['shift'] || keys['Shift'];
+        const isShiftPressed = keys['shift'] || keys['Shift'] || keys['shiftleft'] || keys['shiftright'];
         player.isMoving = isWASD && (dx !== 0 || dy !== 0);
 
-        // Sprinting Logic
+        // Sprinting Logic with Stamina Drain & Recharge
         if (player.isMoving && isShiftPressed && stamina > 0) {
             player.isSprinting = true;
             player.speed = SPRINT_SPEED;
 
-            // Stamina Discharge while sprinting
-            stamina -= 16.0 * (1 / 60);
+            // Stamina Discharge while sprinting (discharges over ~5.5s)
+            stamina -= 18.0 * (1 / 60);
             if (stamina < 0) stamina = 0;
         } else {
             player.isSprinting = false;
@@ -505,15 +505,15 @@ document.addEventListener('DOMContentLoaded', () => {
             // Stamina Recharge when not sprinting
             if (player.isMoving) {
                 // Moving without shift (walking) -> Slow Recharge
-                stamina += 10.0 * (1 / 60);
+                stamina += 12.0 * (1 / 60);
             } else {
                 // Completely still (idle) -> Faster Recharge
-                stamina += 25.0 * (1 / 60);
+                stamina += 28.0 * (1 / 60);
             }
             if (stamina > 100) stamina = 100;
         }
 
-        // Update Orange Stamina Bar HUD
+        // Update Orange Stamina Bar HUD Element
         if (staminaBarFillEl) {
             staminaBarFillEl.style.width = `${Math.max(0, Math.min(100, stamina))}%`;
         }
