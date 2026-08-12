@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
@@ -39,7 +40,7 @@ wss.on('connection', (ws) => {
     const socketId = Math.random().toString(36).substring(2, 9);
     let playerState = null;
 
-    ws.on('message', (message) => {
+    ws.onmessage = (message) => {
         try {
             const data = JSON.parse(message);
 
@@ -68,7 +69,7 @@ wss.on('connection', (ws) => {
         }
     });
 
-    ws.on('close', () => {
+    ws.onclose = () => {
         gameRoom.removePlayer(socketId);
         broadcastGameState();
     });
@@ -90,5 +91,10 @@ server.listen(PORT, () => {
     console.log(`🚀 mysol 2D Pixel Game Server running on port ${PORT}`);
     console.log(`🌐 HTTP Auth & Static Server: http://localhost:${PORT}`);
     console.log(`⚡ WebSocket Multiplayer Endpoint: ws://localhost:${PORT}`);
+    if (process.env.SMTP_USER) {
+        console.log(`📧 Real Email SMTP Configured: [ ${process.env.SMTP_USER} ]`);
+    } else {
+        console.log(`💡 Real Email SMTP: Not configured (Using Console Preview). Create server/.env to enable real email dispatch!`);
+    }
     console.log(`======================================================\n`);
 });

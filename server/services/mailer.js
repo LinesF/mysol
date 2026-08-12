@@ -1,23 +1,37 @@
 const nodemailer = require('nodemailer');
 
-// Configure Nodemailer transporter (supports SMTP env variables or development preview)
-let transporter = null;
-
-if (process.env.SMTP_HOST && process.env.SMTP_USER) {
-    transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS
+function createTransporter() {
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+        // If Gmail service is selected
+        if (process.env.SMTP_SERVICE === 'gmail' || (process.env.SMTP_HOST && process.env.SMTP_HOST.includes('gmail'))) {
+            return nodemailer.createTransport({
+                service: 'gmail',
+                auth: {
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASS
+                }
+            });
         }
-    });
+
+        // Custom SMTP Transporter (Naver, Kakao, SendGrid, etc.)
+        return nodemailer.createTransport({
+            host: process.env.SMTP_HOST || 'smtp.gmail.com',
+            port: parseInt(process.env.SMTP_PORT || '465'),
+            secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465',
+            auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS
+            }
+        });
+    }
+    return null;
 }
 
 async function sendVerificationEmail(targetEmail, code) {
+    const transporter = createTransporter();
+
     const mailOptions = {
-        from: '"mysol 2D Game" <noreply@mysol.game>',
+        from: process.env.SMTP_FROM || `"mysol 2D Game" <${process.env.SMTP_USER || 'noreply@mysol.game'}>`,
         to: targetEmail,
         subject: '[mysol 2D Game] 회원가입 이메일 인증 코드 안내',
         html: `
@@ -39,17 +53,17 @@ async function sendVerificationEmail(targetEmail, code) {
     if (transporter) {
         try {
             await transporter.sendMail(mailOptions);
-            console.log(`[MAILER] Real email sent to ${targetEmail}`);
+            console.log(`[MAILER SUCCESS] Real email dispatched to ${targetEmail}`);
             return true;
         } catch (err) {
-            console.error('[MAILER] SMTP Send Error:', err);
+            console.error('[MAILER ERROR] Failed to send real email:', err.message);
         }
     }
 
-    // Dev Fallback Log
+    // Dev Fallback Log (When SMTP credentials are not yet configured)
     console.log(`\n======================================================`);
-    console.log(`[MAILER SIMULATOR] To: ${targetEmail}`);
-    console.log(`[MAILER SIMULATOR] Verification Code: [ ${code} ]`);
+    console.log(`[MAILER PREVIEW] To: ${targetEmail}`);
+    console.log(`[MAILER PREVIEW] Code: [ ${code} ]`);
     console.log(`======================================================\n`);
     return true;
 }

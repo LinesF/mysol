@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 26: 60-Second Email Verification Code Countdown & Resend Button UX Mechanics
+// mysol 2D Pixel Game Engine - Step 27: Email Modification Input Listener Reset & Real Email SMTP Dispatch Preparation
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -60,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     let verificationTimer = null;
     let countdownSeconds = 60;
+    let lastSentEmail = '';
 
     // Switch between Login and Sign Up tabs
     if (tabBtnLoginEl && tabBtnSignupEl) {
@@ -75,6 +76,28 @@ document.addEventListener('DOMContentLoaded', () => {
             tabBtnLoginEl.classList.remove('active');
             if (authFormSignupEl) authFormSignupEl.classList.remove('hidden');
             if (authFormLoginEl) authFormLoginEl.classList.add('hidden');
+        });
+    }
+
+    function resetVerificationTimer() {
+        if (verificationTimer) {
+            clearInterval(verificationTimer);
+            verificationTimer = null;
+        }
+        if (btnSendCodeEl) {
+            btnSendCodeEl.disabled = false;
+            btnSendCodeEl.classList.remove('disabled-btn');
+            btnSendCodeEl.textContent = '인증 코드 발송';
+        }
+    }
+
+    // Reset countdown if user modifies email address
+    if (signupEmailEl) {
+        signupEmailEl.addEventListener('input', () => {
+            const currentEmail = signupEmailEl.value.trim();
+            if (lastSentEmail && currentEmail !== lastSentEmail) {
+                resetVerificationTimer();
+            }
         });
     }
 
@@ -115,6 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 showFlashlightToast('⚠️ 올바른 이메일 형식을 입력해 주세요 (예: user@domain.com)');
                 return;
             }
+
+            lastSentEmail = rawEmail;
 
             try {
                 const res = await fetch(`${API_BASE}/api/auth/send-code`, {
@@ -177,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const data = await res.json();
                 if (data.success) {
-                    if (verificationTimer) clearInterval(verificationTimer);
+                    resetVerificationTimer();
                     showFlashlightToast(`🎉 ${data.message}`);
                     enterGame(data.user);
                 } else {
@@ -185,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (err) {
                 const username = rawEmail.split('@')[0];
-                if (verificationTimer) clearInterval(verificationTimer);
+                resetVerificationTimer();
                 showFlashlightToast(`🎉 계정이 생성되었습니다! [${username}]`);
                 enterGame({ username, email: rawEmail, avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${username}` });
             }
