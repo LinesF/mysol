@@ -728,8 +728,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function sendPlayerStateUpdate() {
+    let lastStateSendTime = 0;
+
+    function sendPlayerStateUpdate(force = false) {
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        if (!activeRoomInfo) return; // Only send when in an active room
+
+        const now = Date.now();
+        // Throttle updates to ~30fps (33ms) unless forced
+        if (!force && (now - lastStateSendTime < 33)) return;
+        lastStateSendTime = now;
 
         const isMainFlashlightEquipped = hotbar[activeHotbarIndex] && hotbar[activeHotbarIndex].id === 'flashlight';
         const isOffhandFlashlightEquipped = equipment[4] && equipment[4].id === 'flashlight';
@@ -924,7 +932,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         isFlashlightOn = !isFlashlightOn;
         showFlashlightToast(isFlashlightOn ? '🔦 후레쉬 ON' : '🔦 후레쉬 OFF');
-        sendPlayerStateUpdate();
+        sendPlayerStateUpdate(true);
     }
 
     function toggleOffhandAbility() {
@@ -942,7 +950,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             isFlashlightOn = !isFlashlightOn;
             showFlashlightToast(isFlashlightOn ? '🔦 보조손 후레쉬 ON (CapsLock)' : '🔦 보조손 후레쉬 OFF (CapsLock)');
-            sendPlayerStateUpdate();
+            sendPlayerStateUpdate(true);
         } else if (offhandItem.id === 'generator') {
             showFlashlightToast('⚙️ 보조손 수동 발전기 장착 중 (R키를 꾹 눌러 충전)');
         } else {
@@ -1448,12 +1456,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 player.animFrame = (player.animFrame + 1) % 4;
                 player.animTimer = 0;
             }
-
-            sendPlayerStateUpdate();
         } else if (!isDashing) {
             player.animFrame = 0;
             player.animTimer = 0;
         }
+
+        // Always stream state update (throttled to 30fps) so standing still, stopping, flashlight ON/OFF and mouse angle are 100% in sync
+        sendPlayerStateUpdate();
 
         campfire.flickerTimer += 0.15;
 
