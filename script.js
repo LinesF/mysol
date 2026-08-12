@@ -88,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let ws = null;
     let localSocketId = null;
     let remotePlayers = [];
+    let remotePlayersMap = new Map();
     let activeRoomInfo = null;
     let isCreatingPrivate = false;
 
@@ -507,11 +508,19 @@ document.addEventListener('DOMContentLoaded', () => {
                             activeRoomInfo = data.roomInfo;
                             updateActiveRoomInfoUI(activeRoomInfo);
                         }
-                        if (localSocketId) {
-                            remotePlayers = (data.players || []).filter(p => p.id !== localSocketId);
-                        } else {
-                            remotePlayers = data.players || [];
-                        }
+                        const incomingList = (data.players || []).filter(p => !localSocketId || p.id !== localSocketId);
+                        const nextMap = new Map();
+                        incomingList.forEach(p => {
+                            let existing = remotePlayersMap.get(p.id);
+                            if (!existing) {
+                                existing = { ...p, renderX: p.x, renderY: p.y };
+                            } else {
+                                Object.assign(existing, p);
+                            }
+                            nextMap.set(p.id, existing);
+                        });
+                        remotePlayersMap = nextMap;
+                        remotePlayers = Array.from(remotePlayersMap.values());
                     } else if (data.type === 'PUBLIC_ROOM_LIST') {
                         renderPublicRoomList(data.rooms || []);
                     } else if (data.type === 'ROOM_ERROR') {
@@ -1582,24 +1591,47 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.ellipse(0, 16, 16, 7, 0, 0, Math.PI * 2);
             ctx.fill();
 
+            // Legs with Animated Walking Step Offset
             ctx.fillStyle = '#334155';
-            ctx.fillRect(-12, 10, 10, 8);
-            ctx.fillRect(2, 10, 10, 8);
+            const legLOffset = (rp.isMoving && ((rp.animFrame || 0) % 2 === 0)) ? (rp.isSprinting ? -4 : -2) : 0;
+            const legROffset = (rp.isMoving && ((rp.animFrame || 0) % 2 === 1)) ? (rp.isSprinting ? -4 : -2) : 0;
+            ctx.fillRect(-12, 10 + legLOffset, 10, 8);
+            ctx.fillRect(2, 10 + legROffset, 10, 8);
 
+            // Body
             ctx.fillStyle = '#0d9488';
             ctx.fillRect(-14, -6, 28, 18);
             ctx.fillStyle = '#2dd4bf';
             ctx.fillRect(-12, -6, 24, 5);
 
+            // Arms with Dynamic Walking Swing
+            const armOffset = rp.isMoving ? Math.sin((rp.animFrame || 0) * Math.PI / 2) * 4 : 0;
+            ctx.fillStyle = '#0d9488';
+            ctx.fillRect(-18, -4 + armOffset, 5, 12);
+            ctx.fillRect(13, -4 - armOffset, 5, 12);
+
+            // Hair & Face
             ctx.fillStyle = '#a855f7';
             ctx.fillRect(-16, -24, 32, 12);
             ctx.fillStyle = '#fed7aa';
             ctx.fillRect(-14, -14, 28, 12);
 
+            // Eyes / Direction Facing
             ctx.fillStyle = '#0f172a';
-            ctx.fillRect(-7, -11, 5, 5);
-            ctx.fillRect(2, -11, 5, 5);
+            const dir = rp.direction || 'down';
+            if (dir === 'down') {
+                ctx.fillRect(-7, -11, 5, 5);
+                ctx.fillRect(2, -11, 5, 5);
+            } else if (dir === 'up') {
+                ctx.fillStyle = '#9333ea';
+                ctx.fillRect(-14, -14, 28, 12);
+            } else if (dir === 'left') {
+                ctx.fillRect(-10, -11, 5, 5);
+            } else if (dir === 'right') {
+                ctx.fillRect(5, -11, 5, 5);
+            }
 
+            // Username Label Badge
             ctx.font = "700 0.75rem 'Inter', sans-serif";
             ctx.fillStyle = '#38bdf8';
             ctx.textAlign = 'center';
@@ -1939,10 +1971,42 @@ document.addEventListener('DOMContentLoaded', () => {
             fireGrad.addColorStop(0.85, 'rgba(0, 0, 0, 0.12)');
             fireGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
 
-            maskCtx.fillStyle = fireGrad;
-            maskCtx.beginPath();
-            maskCtx.arc(cx, cy, campfireLightRadius, 0, Math.PI * 2);
-            maskCtx.fill();
+            // Cut out ambient light for remote players
+            remotePlayers.forEach(rp => {
+                const rpx = mapRenderX + (rp.renderX !== undefined ? rp.renderX : rp.x);
+                const rpy = mapRenderY + (rp.renderY !== undefined ? rp.renderY : rp.y);
+                const rpBaseRadius = rp.isFlashlightOn ? (2.8 * TILE_SIZE) : (1.8 * TILE_SIZE);
+
+                const rpGrad = maskCtx.createRadialGradient(rpx, rpy, 10, rpx, rpy, rpBaseRadius);
+                rpGrad.addColorStop(0, 'rgba(0, 0, 0, 0.85)');
+                rpGrad.addColorStop(0.6, 'rgba(0, 0, 0, 0.35)');
+                rpGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+
+                maskCtx.fillStyle = rpGrad;
+                maskCtx.beginPath();
+                maskCtx.arc(rpx, rpy, rpBaseRadius, 0, Math.PI * 2);
+                maskCtx.fill();
+
+                if (rp.isFlashlightOn) {
+                    const flashDistance = 6 * TILE_SIZE;
+                    const flashAngle = rp.flashlightAngle || 0;
+                    const halfCone = Math.PI / 6;
+
+                    maskCtx.beginPath();
+                    maskCtx.moveTo(rpx, rpy);
+                    maskCtx.arc(rpx, rpy, flashDistance, flashAngle - halfCone, flashAngle + halfCone);
+                    maskCtx.closePath();
+
+                    const coneGrad = maskCtx.createRadialGradient(rpx, rpy, 0, rpx, rpy, flashDistance);
+                    coneGrad.addColorStop(0, 'rgba(0, 0, 0, 0.15)');
+                    coneGrad.addColorStop(0.08, 'rgba(0, 0, 0, 0.96)');
+                    coneGrad.addColorStop(0.75, 'rgba(0, 0, 0, 0.75)');
+                    coneGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+
+                    maskCtx.fillStyle = coneGrad;
+                    maskCtx.fill();
+                }
+            });
 
             if (isFlashlightActive) {
                 const flashDistance = 6 * TILE_SIZE;
@@ -1977,6 +2041,31 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.beginPath();
             ctx.arc(cx, cy, 260 + flickerRadius, 0, Math.PI * 2);
             ctx.fill();
+
+            // Render Visual Yellow Flashlight Beams for Remote Players
+            remotePlayers.forEach(rp => {
+                if (rp.isFlashlightOn) {
+                    const rpx = mapRenderX + (rp.renderX !== undefined ? rp.renderX : rp.x);
+                    const rpy = mapRenderY + (rp.renderY !== undefined ? rp.renderY : rp.y);
+                    const flashDistance = 6 * TILE_SIZE;
+                    const flashAngle = rp.flashlightAngle || 0;
+                    const halfCone = Math.PI / 6;
+
+                    ctx.beginPath();
+                    ctx.moveTo(rpx, rpy);
+                    ctx.arc(rpx, rpy, flashDistance, flashAngle - halfCone, flashAngle + halfCone);
+                    ctx.closePath();
+
+                    const beamGlow = ctx.createRadialGradient(rpx, rpy, 0, rpx, rpy, flashDistance);
+                    beamGlow.addColorStop(0, 'rgba(254, 240, 138, 0.12)');
+                    beamGlow.addColorStop(0.1, 'rgba(254, 240, 138, 0.45)');
+                    beamGlow.addColorStop(0.7, 'rgba(253, 224, 71, 0.18)');
+                    beamGlow.addColorStop(1.0, 'rgba(253, 224, 71, 0.0)');
+
+                    ctx.fillStyle = beamGlow;
+                    ctx.fill();
+                }
+            });
 
             if (isFlashlightActive) {
                 const flashDistance = 6 * TILE_SIZE;
