@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 18: Sprint & Advanced Stamina Exhaustion System (No Regen While Sprinting, Regen Delay, Yellow Vignette <=30, Dynamic 0-10 Exhaustion State)
+// mysol 2D Pixel Game Engine - Step 19: Space Key Quick Dash Skill (10 Stamina Cost, Ultra-Fast Burst Speed & Motion Blur Ghost Trail)
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -70,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Player Position & Movement Parameters
     const NORMAL_SPEED = 3.5;
     const SPRINT_SPEED = 6.0;
+    const DASH_SPEED = 20.0;
 
     const player = {
         x: MAP_DIM / 2,
@@ -106,9 +107,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Advanced Stamina & Exhaustion System
     let stamina = 100.0;
     let isExhausted = false;
-    let staminaRegenDelayTimer = 0.0; // Wait delay after stopping sprint before regen begins
-    let exhaustionTimer = 0.0;         // Exhaustion penalty timer
-    let lowestStaminaReached = 100.0;  // Tracks lowest stamina during sprint for dynamic penalty calculation
+    let staminaRegenDelayTimer = 0.0;
+    let exhaustionTimer = 0.0;
+    let lowestStaminaReached = 100.0;
+
+    // Space Key Quick Dash System
+    let isDashing = false;
+    let dashTimer = 0.0;
+    let dashCooldownTimer = 0.0;
+    const dashVector = { x: 0, y: 0 };
+    let dashGhostPositions = []; // Motion blur ghost positions
 
     // Bare Hands Combat & Cooldown System
     let isBareHandsCharging = false;
@@ -192,6 +200,59 @@ document.addEventListener('DOMContentLoaded', () => {
 
         isFlashlightOn = !isFlashlightOn;
         showFlashlightToast(isFlashlightOn ? '🔦 후레쉬 ON' : '🔦 후레쉬 OFF');
+    }
+
+    // -------------------------------------------------------------
+    // SPACE KEY QUICK DASH EXECUTION
+    // -------------------------------------------------------------
+    function triggerQuickDash() {
+        if (isDashing || dashCooldownTimer > 0) return;
+        if (isExhausted || stamina < 10.0) return;
+
+        // Determine dash direction (movement keys or facing direction)
+        let vx = 0;
+        let vy = 0;
+
+        if (keys['w']) vy -= 1;
+        if (keys['s']) vy += 1;
+        if (keys['a']) vx -= 1;
+        if (keys['d']) vx += 1;
+
+        if (vx === 0 && vy === 0) {
+            if (player.direction === 'up') vy = -1;
+            else if (player.direction === 'down') vy = 1;
+            else if (player.direction === 'left') vx = -1;
+            else if (player.direction === 'right') vx = 1;
+        }
+
+        const len = Math.hypot(vx, vy);
+        if (len > 0) {
+            vx /= len;
+            vy /= len;
+        } else {
+            vy = 1;
+        }
+
+        dashVector.x = vx;
+        dashVector.y = vy;
+
+        // Consume 10 Stamina instantly
+        stamina -= 10.0;
+        if (stamina < lowestStaminaReached) {
+            lowestStaminaReached = stamina;
+        }
+
+        if (stamina <= 10.0) {
+            isExhausted = true;
+            exhaustionTimer = 2.5;
+        }
+
+        staminaRegenDelayTimer = 0.95;
+
+        isDashing = true;
+        dashTimer = 0.12; // 0.12s ultra-fast burst duration
+        dashCooldownTimer = 0.45; // 0.45s cooldown
+        dashGhostPositions = [];
     }
 
     // -------------------------------------------------------------
@@ -279,6 +340,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (chatInputEl && document.activeElement === chatInputEl) {
+            return;
+        }
+
+        // Space Key Quick Dash Trigger
+        if (e.key === ' ' || e.code === 'Space') {
+            e.preventDefault();
+            triggerQuickDash();
             return;
         }
 
@@ -401,6 +469,38 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Dash Cooldown Update
+        if (dashCooldownTimer > 0) {
+            dashCooldownTimer -= 1 / 60;
+            if (dashCooldownTimer < 0) dashCooldownTimer = 0;
+        }
+
+        // Dash Movement Logic
+        if (isDashing) {
+            dashTimer -= 1 / 60;
+            
+            // Save current position for ghost trail
+            dashGhostPositions.push({ x: player.x, y: player.y, direction: player.direction, alpha: 0.6 });
+            if (dashGhostPositions.length > 5) dashGhostPositions.shift();
+
+            player.x += dashVector.x * DASH_SPEED;
+            player.y += dashVector.y * DASH_SPEED;
+
+            const halfSize = player.size / 2;
+            player.x = Math.max(halfSize + 4, Math.min(MAP_DIM - halfSize - 4, player.x));
+            player.y = Math.max(halfSize + 4, Math.min(MAP_DIM - halfSize - 4, player.y));
+
+            if (dashTimer <= 0) {
+                isDashing = false;
+            }
+        }
+
+        // Fade out ghost trails
+        dashGhostPositions.forEach(ghost => {
+            ghost.alpha -= 0.08;
+        });
+        dashGhostPositions = dashGhostPositions.filter(ghost => ghost.alpha > 0);
+
         // Attack Cooldown Timer Update
         if (attackCooldownTimer > 0) {
             attackCooldownTimer -= 1 / 60;
@@ -451,21 +551,23 @@ document.addEventListener('DOMContentLoaded', () => {
             batteryBarValEl.textContent = Math.round(battery);
         }
 
-        // WASD Movement & Sprint Logic
+        // WASD Movement & Sprint Logic (Skipped during active dash)
         let isWASD = false;
         let dx = 0;
         let dy = 0;
 
-        if (keys['w']) { dy -= 1; player.direction = 'up'; isWASD = true; }
-        if (keys['s']) { dy += 1; player.direction = 'down'; isWASD = true; }
-        if (keys['a']) { dx -= 1; player.direction = 'left'; isWASD = true; }
-        if (keys['d']) { dx += 1; player.direction = 'right'; isWASD = true; }
+        if (!isDashing) {
+            if (keys['w']) { dy -= 1; player.direction = 'up'; isWASD = true; }
+            if (keys['s']) { dy += 1; player.direction = 'down'; isWASD = true; }
+            if (keys['a']) { dx -= 1; player.direction = 'left'; isWASD = true; }
+            if (keys['d']) { dx += 1; player.direction = 'right'; isWASD = true; }
+        }
 
         if (isWASD && !isCameraLocked) {
             toggleCameraLock(true);
         }
 
-        if (!isCameraLocked && !isWASD) {
+        if (!isCameraLocked && !isWASD && !isDashing) {
             let panX = 0;
             let panY = 0;
 
@@ -495,28 +597,24 @@ document.addEventListener('DOMContentLoaded', () => {
         player.isMoving = isWASD && (dx !== 0 || dy !== 0);
 
         // Sprint Execution Logic
-        const canSprint = player.isMoving && isShiftPressed && !isExhausted && stamina > 0;
+        const canSprint = player.isMoving && isShiftPressed && !isExhausted && stamina > 0 && !isDashing;
 
         if (canSprint) {
             player.isSprinting = true;
             player.speed = SPRINT_SPEED;
 
-            // ABSOLUTELY NO STAMINA RECOVERY WHILE SPRINTING! ONLY DRAIN!
             stamina -= 18.0 * (1 / 60);
             if (stamina < lowestStaminaReached) {
                 lowestStaminaReached = stamina;
             }
 
-            // Set delay timer so recovery waits after player stops sprinting
             staminaRegenDelayTimer = 0.85;
 
-            // Exhaustion Trigger Check (Stamina 0 ~ 10)
             if (stamina <= 10.0) {
                 isExhausted = true;
-                // Dynamic penalty: The closer stamina drops to 0, the longer exhaustion duration & regen delay!
-                const penaltyFactor = (10.0 - Math.max(0, stamina)) / 10.0; // 0.0 at 10 stamina, 1.0 at 0 stamina
-                exhaustionTimer = 1.8 + penaltyFactor * 2.5; // 1.8s to 4.3s exhaustion timer
-                staminaRegenDelayTimer = 1.0 + penaltyFactor * 1.5; // 1.0s to 2.5s regen delay
+                const penaltyFactor = (10.0 - Math.max(0, stamina)) / 10.0;
+                exhaustionTimer = 1.8 + penaltyFactor * 2.5;
+                staminaRegenDelayTimer = 1.0 + penaltyFactor * 1.5;
             }
 
             if (stamina <= 0) {
@@ -526,7 +624,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else {
             player.isSprinting = false;
-            player.speed = NORMAL_SPEED;
+            if (!isDashing) {
+                player.speed = NORMAL_SPEED;
+            }
 
             // Update Exhaustion Timer
             if (isExhausted) {
@@ -540,13 +640,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (staminaRegenDelayTimer > 0) {
                 staminaRegenDelayTimer -= 1 / 60;
             } else {
-                // Stamina Recovery (Only triggers after delay timer reaches 0!)
                 let baseRegenRate = player.isMoving ? 12.0 : 26.0;
 
-                // Slow down recovery during Exhaustion state
                 if (isExhausted) {
                     const penaltyFactor = (10.0 - Math.max(0, lowestStaminaReached)) / 10.0;
-                    const slowMultiplier = Math.max(0.3, 0.65 - penaltyFactor * 0.35); // 0.3x to 0.65x speed
+                    const slowMultiplier = Math.max(0.3, 0.65 - penaltyFactor * 0.35);
                     baseRegenRate *= slowMultiplier;
                 }
 
@@ -572,8 +670,8 @@ document.addEventListener('DOMContentLoaded', () => {
             staminaBarValEl.textContent = Math.round(stamina);
         }
 
-        // Move Player Position
-        if (player.isMoving) {
+        // Move Player Position (Standard WASD)
+        if (player.isMoving && !isDashing) {
             if (dx !== 0 && dy !== 0) {
                 dx *= 0.7071;
                 dy *= 0.7071;
@@ -592,7 +690,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 player.animFrame = (player.animFrame + 1) % 4;
                 player.animTimer = 0;
             }
-        } else {
+        } else if (!isDashing) {
             player.animFrame = 0;
             player.animTimer = 0;
         }
@@ -624,6 +722,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             drawGrassTilemap();
             drawCampfire();
+            
+            // Draw Motion Blur Ghost Trails for Quick Dash Skill
+            drawDashGhostTrails();
+            
             drawPlayerCharacter();
 
             if (activeAttackAnimation) {
@@ -639,7 +741,6 @@ document.addEventListener('DOMContentLoaded', () => {
             drawLightingOverlay(mapRenderX, mapRenderY);
             drawOffScreenCharacterArrow(mapRenderX, mapRenderY);
 
-            // Draw Screen Edge Yellow Vignette Overlay when Stamina <= 30
             if (stamina <= 30.0) {
                 drawStaminaYellowVignette();
             }
@@ -650,6 +751,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         requestAnimationFrame(render);
+    }
+
+    // Draw Motion Blur Ghost Trails during Quick Dash
+    function drawDashGhostTrails() {
+        dashGhostPositions.forEach(ghost => {
+            ctx.save();
+            ctx.translate(ghost.x, ghost.y);
+            ctx.globalAlpha = ghost.alpha;
+
+            ctx.fillStyle = 'rgba(56, 189, 248, 0.4)';
+            ctx.fillRect(-14, -14, 28, 24);
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.fillRect(-12, -6, 24, 5);
+
+            ctx.restore();
+        });
     }
 
     // -------------------------------------------------------------
@@ -671,12 +789,10 @@ document.addEventListener('DOMContentLoaded', () => {
         );
 
         if (isExhausted) {
-            // Deeper amber/reddish-yellow pulse during exhaustion
             vignetteGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
             vignetteGrad.addColorStop(0.5, `rgba(234, 88, 12, ${finalAlpha * 0.4})`);
             vignetteGrad.addColorStop(1, `rgba(220, 38, 38, ${finalAlpha * 0.85})`);
         } else {
-            // Warm Amber Yellow vignette
             vignetteGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
             vignetteGrad.addColorStop(0.55, `rgba(245, 158, 11, ${finalAlpha * 0.35})`);
             vignetteGrad.addColorStop(1, `rgba(234, 179, 8, ${finalAlpha * 0.75})`);
