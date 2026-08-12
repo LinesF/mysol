@@ -12,13 +12,90 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- Title Screen Overlay (Login, Sign Up & Guest Mode) -->
+    <div id="title-screen-overlay" class="title-screen-overlay">
+        <div class="title-card">
+            <!-- Game Logo & Subtitle -->
+            <div class="title-logo-container">
+                <span class="logo-badge">2D PIXEL SURVIVAL</span>
+                <h1 class="logo-title">mysol</h1>
+            </div>
+
+            <!-- Auth Navigation Tabs -->
+            <div class="auth-tabs">
+                <button id="tab-btn-login" class="auth-tab-btn active">로그인</button>
+                <button id="tab-btn-signup" class="auth-tab-btn">계정 생성</button>
+            </div>
+
+            <!-- Form 1: LOGIN TAB -->
+            <div id="auth-form-login" class="auth-form-body">
+                <!-- Google OAuth Button -->
+                <button id="btn-google-login" class="social-login-btn google-btn">
+                    <svg class="google-icon" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+                    <span>Google 계정으로 로그인</span>
+                </button>
+
+                <div class="form-divider"><span>또는 이메일로 로그인</span></div>
+
+                <div class="input-group">
+                    <label for="login-email">이메일 주소</label>
+                    <input type="email" id="login-email" placeholder="example@mysol.com" autocomplete="off">
+                </div>
+                <div class="input-group">
+                    <label for="login-password">비밀번호</label>
+                    <input type="password" id="login-password" placeholder="••••••••">
+                </div>
+
+                <button id="btn-login-submit" class="auth-submit-btn">로그인</button>
+            </div>
+
+            <!-- Form 2: SIGN UP TAB (Email -> Code Verification -> Password & Confirm) -->
+            <div id="auth-form-signup" class="auth-form-body hidden">
+                <div class="input-group">
+                    <label for="signup-email">이메일 주소</label>
+                    <div class="input-with-button">
+                        <input type="email" id="signup-email" placeholder="example@mysol.com" autocomplete="off">
+                        <button id="btn-send-code" class="action-sub-btn">인증 코드 발송</button>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="signup-code">인증 코드 (6자리)</label>
+                    <input type="text" id="signup-code" placeholder="예: 742918" maxlength="6" autocomplete="off">
+                </div>
+
+                <div class="input-group">
+                    <label for="signup-password">비밀번호</label>
+                    <input type="password" id="signup-password" placeholder="비밀번호 입력 (6자리 이상)">
+                </div>
+
+                <div class="input-group">
+                    <label for="signup-password-confirm">비밀번호 재확인</label>
+                    <input type="password" id="signup-password-confirm" placeholder="비밀번호 다시 입력">
+                </div>
+
+                <button id="btn-signup-submit" class="auth-submit-btn">계정 생성 완료</button>
+            </div>
+
+            <div class="form-divider bottom-divider"></div>
+
+            <!-- Guest Mode Button -->
+            <button id="btn-guest-start" class="guest-start-btn">
+                <span>👤 방문자로 시작하기</span>
+            </button>
+        </div>
+    </div>
+
     <!-- Top-Left Character Profile & Status Bars -->
     <header class="top-header">
         <div class="player-hud">
             <div class="player-avatar-container">
-                <img src="https://github.com/LinesF.png" alt="Player Portrait" class="player-avatar-img" onerror="this.src='https://api.dicebear.com/7.x/identicon/svg?seed=LinesF'">
+                <img id="player-avatar-img" src="https://github.com/LinesF.png" alt="Player Portrait" class="player-avatar-img" onerror="this.src='https://api.dicebear.com/7.x/identicon/svg?seed=LinesF'">
             </div>
             <div class="status-bars-container">
+                <div class="player-username-row">
+                    <span id="player-username-display" class="player-username-display">LinesF</span>
+                </div>
                 <!-- 1. Red Bar: Health (100) -->
                 <div class="status-bar-row health-row">
                     <span class="bar-label">HP</span>

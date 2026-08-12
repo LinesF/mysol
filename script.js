@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 22: Hand-crank Generator Item (⚙️ 수동 발전기) & Halved Speed R-Key Battery Recharge Mechanics
+// mysol 2D Pixel Game Engine - Step 23: Title Screen Overlay, Google OAuth, Email Verification Account Creation & Guest Mode
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -8,6 +8,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Title Screen & Auth DOM Elements
+    const titleScreenOverlayEl = document.getElementById('title-screen-overlay');
+    const tabBtnLoginEl = document.getElementById('tab-btn-login');
+    const tabBtnSignupEl = document.getElementById('tab-btn-signup');
+    const authFormLoginEl = document.getElementById('auth-form-login');
+    const authFormSignupEl = document.getElementById('auth-form-signup');
+    
+    const btnGoogleLoginEl = document.getElementById('btn-google-login');
+    const loginEmailEl = document.getElementById('login-email');
+    const loginPasswordEl = document.getElementById('login-password');
+    const btnLoginSubmitEl = document.getElementById('btn-login-submit');
+
+    const signupEmailEl = document.getElementById('signup-email');
+    const btnSendCodeEl = document.getElementById('btn-send-code');
+    const signupCodeEl = document.getElementById('signup-code');
+    const signupPasswordEl = document.getElementById('signup-password');
+    const signupPasswordConfirmEl = document.getElementById('signup-password-confirm');
+    const btnSignupSubmitEl = document.getElementById('btn-signup-submit');
+
+    const btnGuestStartEl = document.getElementById('btn-guest-start');
+    const playerUsernameDisplayEl = document.getElementById('player-username-display');
+    const playerAvatarImgEl = document.getElementById('player-avatar-img');
+
+    // In-game HUD & UI Elements
     const chatInputEl = document.getElementById('chat-input');
     const chatCharCountEl = document.getElementById('chat-char-count');
     const hotbarGridEl = document.getElementById('hotbar-grid');
@@ -23,6 +47,172 @@ document.addEventListener('DOMContentLoaded', () => {
     const staminaBarFillEl = document.getElementById('stamina-bar-fill');
     const staminaBarValEl = document.getElementById('stamina-bar-val');
     const phoneScreenContainerEl = document.getElementById('phone-screen-container');
+
+    // -------------------------------------------------------------
+    // AUTH & ACCOUNT SYSTEM LOGIC
+    // -------------------------------------------------------------
+    let currentUser = null;
+    let pendingVerificationCode = null;
+    let pendingEmail = null;
+
+    // Load registered accounts from LocalStorage
+    function getStoredUsers() {
+        try {
+            return JSON.parse(localStorage.getItem('mysol_users') || '{}');
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function saveStoredUsers(users) {
+        try {
+            localStorage.setItem('mysol_users', JSON.stringify(users));
+        } catch (e) {}
+    }
+
+    // Switch between Login and Sign Up tabs
+    if (tabBtnLoginEl && tabBtnSignupEl) {
+        tabBtnLoginEl.addEventListener('click', () => {
+            tabBtnLoginEl.classList.add('active');
+            tabBtnSignupEl.classList.remove('active');
+            if (authFormLoginEl) authFormLoginEl.classList.remove('hidden');
+            if (authFormSignupEl) authFormSignupEl.classList.add('hidden');
+        });
+
+        tabBtnSignupEl.addEventListener('click', () => {
+            tabBtnSignupEl.classList.add('active');
+            tabBtnLoginEl.classList.remove('active');
+            if (authFormSignupEl) authFormSignupEl.classList.remove('hidden');
+            if (authFormLoginEl) authFormLoginEl.classList.add('hidden');
+        });
+    }
+
+    // 1. Dispatch Verification Code
+    if (btnSendCodeEl) {
+        btnSendCodeEl.addEventListener('click', () => {
+            const email = (signupEmailEl ? signupEmailEl.value : '').trim();
+            if (!email || !email.includes('@')) {
+                showFlashlightToast('⚠️ 올바른 이메일 주소를 입력해 주세요.');
+                return;
+            }
+
+            // Generate 6-digit random code
+            pendingVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+            pendingEmail = email;
+
+            showFlashlightToast(`📩 [인증 코드] ${email} -> [ ${pendingVerificationCode} ]`);
+            if (signupCodeEl) signupCodeEl.focus();
+        });
+    }
+
+    // 2. Submit Sign Up (Account Creation)
+    if (btnSignupSubmitEl) {
+        btnSignupSubmitEl.addEventListener('click', () => {
+            const email = (signupEmailEl ? signupEmailEl.value : '').trim();
+            const code = (signupCodeEl ? signupCodeEl.value : '').trim();
+            const password = signupPasswordEl ? signupPasswordEl.value : '';
+            const passwordConfirm = signupPasswordConfirmEl ? signupPasswordConfirmEl.value : '';
+
+            if (!email || !email.includes('@')) {
+                showFlashlightToast('⚠️ 올바른 이메일 주소를 입력해 주세요.');
+                return;
+            }
+            if (!pendingVerificationCode || pendingEmail !== email || code !== pendingVerificationCode) {
+                showFlashlightToast('⚠️ 인증 코드가 일치하지 않거나 만료되었습니다.');
+                return;
+            }
+            if (password.length < 6) {
+                showFlashlightToast('⚠️ 비밀번호는 최소 6자리 이상이어야 합니다.');
+                return;
+            }
+            if (password !== passwordConfirm) {
+                showFlashlightToast('⚠️ 비밀번호 재확인이 일치하지 않습니다.');
+                return;
+            }
+
+            const users = getStoredUsers();
+            if (users[email]) {
+                showFlashlightToast('⚠️ 이미 가입된 이메일 주소입니다.');
+                return;
+            }
+
+            const username = email.split('@')[0];
+            users[email] = {
+                email,
+                username,
+                password, // In real backend, hashed with bcrypt
+                type: 'email',
+                createdAt: new Date().toISOString()
+            };
+            saveStoredUsers(users);
+
+            showFlashlightToast(`🎉 계정이 생성되었습니다! [${username}] 님 환영합니다.`);
+            enterGame({ username, email, avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${username}` });
+        });
+    }
+
+    // 3. Submit Email Login
+    if (btnLoginSubmitEl) {
+        btnLoginSubmitEl.addEventListener('click', () => {
+            const email = (loginEmailEl ? loginEmailEl.value : '').trim();
+            const password = loginPasswordEl ? loginPasswordEl.value : '';
+
+            if (!email || !password) {
+                showFlashlightToast('⚠️ 이메일과 비밀번호를 모두 입력해 주세요.');
+                return;
+            }
+
+            const users = getStoredUsers();
+            const user = users[email];
+
+            if (!user || user.password !== password) {
+                showFlashlightToast('⚠️ 이메일 또는 비밀번호가 올바르지 않습니다.');
+                return;
+            }
+
+            showFlashlightToast(`🔑 로그인 성공! [${user.username}] 님 환영합니다.`);
+            enterGame({ username: user.username, email: user.email, avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${user.username}` });
+        });
+    }
+
+    // 4. Google Account Login
+    if (btnGoogleLoginEl) {
+        btnGoogleLoginEl.addEventListener('click', () => {
+            const googleUsername = 'Google_User';
+            showFlashlightToast('🌐 Google 계정으로 로그인 되었습니다.');
+            enterGame({
+                username: googleUsername,
+                email: 'google_user@gmail.com',
+                avatar: 'https://lh3.googleusercontent.com/a/default-user'
+            });
+        });
+    }
+
+    // 5. Guest Mode Start
+    if (btnGuestStartEl) {
+        btnGuestStartEl.addEventListener('click', () => {
+            const guestId = `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
+            showFlashlightToast(`👤 방문자로 시작합니다: [${guestId}]`);
+            enterGame({
+                username: guestId,
+                email: 'guest@mysol.local',
+                avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${guestId}`
+            });
+        });
+    }
+
+    function enterGame(userData) {
+        currentUser = userData;
+        if (playerUsernameDisplayEl) {
+            playerUsernameDisplayEl.textContent = userData.username;
+        }
+        if (playerAvatarImgEl && userData.avatar) {
+            playerAvatarImgEl.src = userData.avatar;
+        }
+        if (titleScreenOverlayEl) {
+            titleScreenOverlayEl.classList.add('hidden');
+        }
+    }
 
     function safeRoundRect(x, y, w, h, r) {
         try {
@@ -134,7 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (flashlightToastTimeout) clearTimeout(flashlightToastTimeout);
         flashlightToastTimeout = setTimeout(() => {
             flashlightToastEl.classList.add('hidden');
-        }, 2000);
+        }, 2800);
     }
 
     function showCameraWarningToast() {
@@ -378,6 +568,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.addEventListener('keydown', (e) => {
+        if (titleScreenOverlayEl && !titleScreenOverlayEl.classList.contains('hidden')) {
+            return; // Ignore game hotkeys while on Title Screen
+        }
+
         if (e.key === 'Enter') {
             e.preventDefault();
             handleChatEnterKey();
@@ -502,10 +696,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function update() {
+        const isTitleOpen = titleScreenOverlayEl && !titleScreenOverlayEl.classList.contains('hidden');
         const isChatFocused = chatInputEl && (document.activeElement === chatInputEl);
         const isInventoryOpen = inventoryWindowEl && !inventoryWindowEl.classList.contains('hidden');
 
-        if (isChatFocused || isInventoryOpen) {
+        if (isTitleOpen || isChatFocused || isInventoryOpen) {
             player.isMoving = false;
             player.isSprinting = false;
             player.animFrame = 0;
@@ -565,7 +760,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Hand-crank Generator Battery Recharge Logic (R-Key hold while equipping Generator)
+        // Hand-crank Generator Battery Recharge Logic
         const isMainGeneratorEquipped = hotbar[activeHotbarIndex] && hotbar[activeHotbarIndex].id === 'generator';
         const isOffhandGeneratorEquipped = equipment[4] && equipment[4].id === 'generator';
         const hasGeneratorEquipped = isMainGeneratorEquipped || isOffhandGeneratorEquipped;
@@ -573,7 +768,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const isRecharging = (keys['r'] || keys['R']) && hasGeneratorEquipped;
 
         if (isRecharging) {
-            // Halved battery recharge speed (full in 6 seconds = 100 / 6 % per second)
             battery += (100 / 6) * (1 / 60);
             if (battery > 100) battery = 100;
             if (batteryBarFillEl) batteryBarFillEl.classList.add('recharging');
