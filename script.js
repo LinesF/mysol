@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 23: Title Screen Overlay, Google OAuth, Email Verification Account Creation & Guest Mode
+// mysol 2D Pixel Game Engine - Step 24: Enhanced Account Creation Dual Duplicate Email & Case-Insensitive Conflict Prevention
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -49,11 +49,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const phoneScreenContainerEl = document.getElementById('phone-screen-container');
 
     // -------------------------------------------------------------
-    // AUTH & ACCOUNT SYSTEM LOGIC
+    // ENHANCED AUTH & ACCOUNT CONFLICT SYSTEM
     // -------------------------------------------------------------
     let currentUser = null;
     let pendingVerificationCode = null;
     let pendingEmail = null;
+
+    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     // Load registered accounts from LocalStorage
     function getStoredUsers() {
@@ -68,6 +70,13 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             localStorage.setItem('mysol_users', JSON.stringify(users));
         } catch (e) {}
+    }
+
+    // Normalized Case-Insensitive Duplicate Email Checker
+    function isDuplicateEmail(email) {
+        const users = getStoredUsers();
+        const normalized = email.trim().toLowerCase();
+        return !!users[normalized];
     }
 
     // Switch between Login and Sign Up tabs
@@ -87,40 +96,60 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 1. Dispatch Verification Code
+    // 1. Dispatch Verification Code with Immediate Duplicate Email Pre-Check
     if (btnSendCodeEl) {
         btnSendCodeEl.addEventListener('click', () => {
-            const email = (signupEmailEl ? signupEmailEl.value : '').trim();
-            if (!email || !email.includes('@')) {
-                showFlashlightToast('⚠️ 올바른 이메일 주소를 입력해 주세요.');
+            const rawEmail = (signupEmailEl ? signupEmailEl.value : '').trim();
+            const normalizedEmail = rawEmail.toLowerCase();
+
+            if (!rawEmail || !EMAIL_REGEX.test(rawEmail)) {
+                showFlashlightToast('⚠️ 올바른 이메일 형식을 입력해 주세요 (예: user@domain.com)');
                 return;
             }
 
-            // Generate 6-digit random code
-            pendingVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-            pendingEmail = email;
+            // Early Duplicate Email Verification Check
+            if (isDuplicateEmail(normalizedEmail)) {
+                showFlashlightToast('⚠️ 이미 가입된 이메일 주소입니다. 로그인 탭을 이용해 주세요.');
+                return;
+            }
 
-            showFlashlightToast(`📩 [인증 코드] ${email} -> [ ${pendingVerificationCode} ]`);
+            // Generate 6-digit random verification code
+            pendingVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+            pendingEmail = normalizedEmail;
+
+            showFlashlightToast(`📩 [인증 코드] ${normalizedEmail} -> [ ${pendingVerificationCode} ]`);
             if (signupCodeEl) signupCodeEl.focus();
         });
     }
 
-    // 2. Submit Sign Up (Account Creation)
+    // 2. Submit Sign Up (Account Creation) with Dual Duplicate & Conflict Validation
     if (btnSignupSubmitEl) {
         btnSignupSubmitEl.addEventListener('click', () => {
-            const email = (signupEmailEl ? signupEmailEl.value : '').trim();
+            const rawEmail = (signupEmailEl ? signupEmailEl.value : '').trim();
+            const normalizedEmail = rawEmail.toLowerCase();
             const code = (signupCodeEl ? signupCodeEl.value : '').trim();
             const password = signupPasswordEl ? signupPasswordEl.value : '';
             const passwordConfirm = signupPasswordConfirmEl ? signupPasswordConfirmEl.value : '';
 
-            if (!email || !email.includes('@')) {
-                showFlashlightToast('⚠️ 올바른 이메일 주소를 입력해 주세요.');
+            // 1) Email Format Validation
+            if (!rawEmail || !EMAIL_REGEX.test(rawEmail)) {
+                showFlashlightToast('⚠️ 올바른 이메일 형식을 입력해 주세요.');
                 return;
             }
-            if (!pendingVerificationCode || pendingEmail !== email || code !== pendingVerificationCode) {
-                showFlashlightToast('⚠️ 인증 코드가 일치하지 않거나 만료되었습니다.');
+
+            // 2) Re-Verification Duplicate Email Check (Conflict Prevention)
+            if (isDuplicateEmail(normalizedEmail)) {
+                showFlashlightToast('⚠️ 이미 가입된 이메일 주소입니다. 로그인 탭을 이용해 주세요.');
                 return;
             }
+
+            // 3) Verification Code Match Check
+            if (!pendingVerificationCode || pendingEmail !== normalizedEmail || code !== pendingVerificationCode) {
+                showFlashlightToast('⚠️ 인증 코드가 일치하지 않거나 발송되지 않았습니다.');
+                return;
+            }
+
+            // 4) Password Length & Matching Validation
             if (password.length < 6) {
                 showFlashlightToast('⚠️ 비밀번호는 최소 6자리 이상이어야 합니다.');
                 return;
@@ -130,40 +159,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            // Extract base username & generate unique discriminator if duplicate
+            let baseUsername = normalizedEmail.split('@')[0];
             const users = getStoredUsers();
-            if (users[email]) {
-                showFlashlightToast('⚠️ 이미 가입된 이메일 주소입니다.');
-                return;
+            let finalUsername = baseUsername;
+
+            const existingUsernames = Object.values(users).map(u => u.username?.toLowerCase());
+            if (existingUsernames.includes(baseUsername.toLowerCase())) {
+                finalUsername = `${baseUsername}_${Math.floor(1000 + Math.random() * 9000)}`;
             }
 
-            const username = email.split('@')[0];
-            users[email] = {
-                email,
-                username,
-                password, // In real backend, hashed with bcrypt
+            // Save user account with normalized email key
+            users[normalizedEmail] = {
+                email: normalizedEmail,
+                username: finalUsername,
+                password: password, // Note: Production backend will use bcrypt hash
                 type: 'email',
                 createdAt: new Date().toISOString()
             };
             saveStoredUsers(users);
 
-            showFlashlightToast(`🎉 계정이 생성되었습니다! [${username}] 님 환영합니다.`);
-            enterGame({ username, email, avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${username}` });
+            // Clear pending code
+            pendingVerificationCode = null;
+            pendingEmail = null;
+
+            showFlashlightToast(`🎉 계정이 성공적으로 생성되었습니다! [${finalUsername}] 님 환영합니다.`);
+            enterGame({ username: finalUsername, email: normalizedEmail, avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${finalUsername}` });
         });
     }
 
-    // 3. Submit Email Login
+    // 3. Submit Email Login with Normalized Case-Insensitive Matching
     if (btnLoginSubmitEl) {
         btnLoginSubmitEl.addEventListener('click', () => {
-            const email = (loginEmailEl ? loginEmailEl.value : '').trim();
+            const rawEmail = (loginEmailEl ? loginEmailEl.value : '').trim();
+            const normalizedEmail = rawEmail.toLowerCase();
             const password = loginPasswordEl ? loginPasswordEl.value : '';
 
-            if (!email || !password) {
+            if (!rawEmail || !password) {
                 showFlashlightToast('⚠️ 이메일과 비밀번호를 모두 입력해 주세요.');
                 return;
             }
 
             const users = getStoredUsers();
-            const user = users[email];
+            const user = users[normalizedEmail];
 
             if (!user || user.password !== password) {
                 showFlashlightToast('⚠️ 이메일 또는 비밀번호가 올바르지 않습니다.');
@@ -569,7 +607,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('keydown', (e) => {
         if (titleScreenOverlayEl && !titleScreenOverlayEl.classList.contains('hidden')) {
-            return; // Ignore game hotkeys while on Title Screen
+            return;
         }
 
         if (e.key === 'Enter') {
