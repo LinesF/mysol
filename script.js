@@ -1639,6 +1639,14 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.shadowBlur = 4;
             ctx.fillText(rp.username || 'Player', 0, -32);
 
+            // Speech Bubble rendering for Remote Player
+            if (rp.speechBubble && rp.speechBubble.text) {
+                const remainingMs = (rp.speechBubble.expiresAt || 0) - Date.now();
+                if (remainingMs > 0) {
+                    drawSpeechBubbleAt(0, -38, rp.speechBubble.text, remainingMs / 1000);
+                }
+            }
+
             ctx.restore();
         });
     }
@@ -1873,14 +1881,11 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.restore();
     }
 
-    function drawSpeechBubble(bubble) {
-        const px = player.x;
-        const py = player.y - 38;
-
+    function drawSpeechBubbleAt(px, py, text, remainingSeconds = 5.0) {
         ctx.save();
         ctx.font = "600 0.85rem 'Inter', sans-serif";
 
-        const textMetrics = ctx.measureText(bubble.text);
+        const textMetrics = ctx.measureText(text);
         const textWidth = textMetrics.width;
         const paddingX = 14;
         const bubbleW = textWidth + paddingX * 2;
@@ -1889,8 +1894,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const by = py - bubbleH - 8;
 
         let alpha = 1.0;
-        if (bubble.remainingTime < 0.5) {
-            alpha = bubble.remainingTime / 0.5;
+        if (remainingSeconds < 0.8) {
+            alpha = remainingSeconds / 0.8;
         }
         ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
 
@@ -1911,7 +1916,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.beginPath();
         ctx.moveTo(px - 5, by + bubbleH);
         ctx.lineTo(px, by + bubbleH + 6);
-        ctx.lineTo(px + 5, by + bubbleH + 6);
+        ctx.lineTo(px + 5, by + bubbleH);
         ctx.fillStyle = '#0f172a';
         ctx.fill();
         ctx.strokeStyle = '#38bdf8';
@@ -1921,9 +1926,14 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(bubble.text, px, by + bubbleH / 2);
+        ctx.fillText(text, px, by + bubbleH / 2);
 
         ctx.restore();
+    }
+
+    function drawSpeechBubble(bubble) {
+        if (!bubble || !bubble.text) return;
+        drawSpeechBubbleAt(player.x, player.y - 38, bubble.text, bubble.remainingTime);
     }
 
     function drawLightingOverlay(mapRenderX, mapRenderY) {

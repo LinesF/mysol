@@ -37,6 +37,12 @@ class Room {
     }
 
     getSnapshot() {
+        const now = Date.now();
+        for (const p of this.players.values()) {
+            if (p.speechBubble && p.speechBubble.expiresAt <= now) {
+                p.speechBubble = null;
+            }
+        }
         return Array.from(this.players.values());
     }
 
