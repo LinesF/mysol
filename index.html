@@ -36,7 +36,7 @@
                     </div>
                 </div>
                 <!-- 3. Grey Bar: Flashlight Battery Utility (100/100) -->
-                <div class="status-bar-row equip-row" title="후레쉬 배터리 (F키 / 우클릭 ON/OFF, R키 충전)">
+                <div class="status-bar-row equip-row" title="후레쉬 배터리 (F키 / CapsLock ON/OFF, R키 충전)">
                     <span class="bar-label">BAT</span>
                     <div class="bar-track">
                         <div id="battery-bar-fill" class="bar-fill grey-fill" style="width: 100%;"></div>
@@ -59,7 +59,7 @@
 
     <!-- Flashlight Controls Guidance Banner & Camera Limit Warning Toast Banner -->
     <div id="flashlight-toast" class="flashlight-toast hidden">
-        <span>🔦 후레쉬 ON (F / 마우스 우클릭 | R키로 충전)</span>
+        <span>🔦 후레쉬 ON (F / CapsLock | R키로 충전)</span>
     </div>
 
     <div id="camera-warning-toast" class="camera-warning-toast hidden">
@@ -68,8 +68,21 @@
 
     <!-- Bottom Left Stack: Inventory Window (Above Chat Bar) & Chat Bar -->
     <div class="bottom-left-stack">
-        <!-- Inventory Window (3 cols x 2 rows) -->
+        <!-- Inventory Window (Equipment Grid + Inventory Grid) -->
         <div id="inventory-window" class="inventory-window hidden">
+            <!-- 1. Equipment Section (6 slots: Head, Body, Legs, Feet, Offhand, Special) -->
+            <div class="inventory-header">
+                <span class="inventory-title">🛡️ EQUIPMENT</span>
+                <span class="inventory-shortcut">CapsLock</span>
+            </div>
+            <div id="equipment-grid" class="equipment-grid">
+                <!-- 6 Equipment slots (3x2) -->
+            </div>
+
+            <!-- Divider -->
+            <div class="inventory-divider"></div>
+
+            <!-- 2. Inventory Section (6 slots: 3x2) -->
             <div class="inventory-header">
                 <span class="inventory-title">🎒 INVENTORY</span>
                 <span class="inventory-shortcut">Tab</span>

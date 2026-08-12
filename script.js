@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 20: Bare Hands Attack Stamina Costs (Normal Attack -3 Stamina, Fully Charged Heavy Attack -5 Stamina)
+// mysol 2D Pixel Game Engine - Step 21: 6-Slot Equipment System (Head, Body, Legs, Feet, Offhand, Special) & Offhand CapsLock Ability Toggle
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatCharCountEl = document.getElementById('chat-char-count');
     const hotbarGridEl = document.getElementById('hotbar-grid');
     const inventoryGridEl = document.getElementById('inventory-grid');
+    const equipmentGridEl = document.getElementById('equipment-grid');
     const inventoryWindowEl = document.getElementById('inventory-window');
     const btnToggleInventoryEl = document.getElementById('btn-toggle-inventory');
     const camLockBadgeEl = document.getElementById('cam-lock-badge');
@@ -189,8 +190,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function toggleFlashlight() {
-        const equipped = hotbar[activeHotbarIndex];
-        if (!equipped || equipped.id !== 'flashlight') return;
+        const equippedMain = hotbar[activeHotbarIndex];
+        const equippedOffhand = equipment[4];
+
+        const hasFlashlight = (equippedMain && equippedMain.id === 'flashlight') || (equippedOffhand && equippedOffhand.id === 'flashlight');
+        if (!hasFlashlight) return;
 
         if (battery <= 0) {
             showFlashlightToast('⚠️ 배터리 부족! (R키를 꾹 눌러 충전하세요)');
@@ -200,6 +204,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
         isFlashlightOn = !isFlashlightOn;
         showFlashlightToast(isFlashlightOn ? '🔦 후레쉬 ON' : '🔦 후레쉬 OFF');
+    }
+
+    // Toggle Offhand Item Ability (CapsLock Key)
+    function toggleOffhandAbility() {
+        const offhandItem = equipment[4]; // Index 4 is Offhand
+        if (!offhandItem) {
+            showFlashlightToast('⚠️ 보조손에 사용 가능한 장비가 없습니다.');
+            return;
+        }
+
+        if (offhandItem.id === 'flashlight') {
+            if (battery <= 0) {
+                showFlashlightToast('⚠️ 배터리 부족! (R키를 꾹 눌러 충전하세요)');
+                isFlashlightOn = false;
+                return;
+            }
+            isFlashlightOn = !isFlashlightOn;
+            showFlashlightToast(isFlashlightOn ? '🔦 보조손 후레쉬 ON (CapsLock)' : '🔦 보조손 후레쉬 OFF (CapsLock)');
+        } else {
+            showFlashlightToast(`✨ 보조손 장비 [${offhandItem.name}] 장착 중`);
+        }
     }
 
     // -------------------------------------------------------------
@@ -235,7 +260,6 @@ document.addEventListener('DOMContentLoaded', () => {
         dashVector.x = vx;
         dashVector.y = vy;
 
-        // Consume 10 Stamina instantly
         stamina -= 10.0;
         if (stamina < lowestStaminaReached) {
             lowestStaminaReached = stamina;
@@ -255,13 +279,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // BARE HANDS ATTACK & CHARGE LOGIC (Normal -3 Stamina, Heavy -5 Stamina)
+    // BARE HANDS ATTACK & CHARGE LOGIC
     // -------------------------------------------------------------
     function startBareHandsCharge() {
         const equipped = hotbar[activeHotbarIndex];
         if (!equipped || equipped.id !== 'hands') return;
         if (attackCooldownTimer > 0) return;
-        if (isExhausted || stamina < 3.0) return; // Requires at least 3 stamina & not exhausted
+        if (isExhausted || stamina < 3.0) return;
 
         isBareHandsCharging = true;
         chargeHoldTimer = 0.0;
@@ -281,7 +305,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const attackAngle = Math.atan2(mouseY - screenCenterY, mouseX - screenCenterX);
 
         if (chargeHoldTimer >= 0.5) {
-            // Fully Charged Heavy Attack -> Consumes 5 Stamina!
             stamina -= 5.0;
 
             activeAttackAnimation = {
@@ -293,7 +316,6 @@ document.addEventListener('DOMContentLoaded', () => {
             attackCooldownTimer = 0.45;
             maxAttackCooldownDuration = 0.45;
         } else {
-            // Normal Melee Attack -> Consumes 3 Stamina!
             stamina -= 3.0;
 
             activeAttackAnimation = {
@@ -329,8 +351,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Mouse Right Click Event Handlers
     window.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        const equipped = hotbar[activeHotbarIndex];
-        if (equipped && equipped.id === 'flashlight') {
+        const equippedMain = hotbar[activeHotbarIndex];
+        if (equippedMain && equippedMain.id === 'flashlight') {
             toggleFlashlight();
         }
     });
@@ -364,6 +386,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // CapsLock Key Trigger Offhand Ability
+        if (e.key === 'CapsLock') {
+            e.preventDefault();
+            toggleOffhandAbility();
+            return;
+        }
+
         if (e.key === ' ' || e.code === 'Space') {
             e.preventDefault();
             triggerQuickDash();
@@ -376,12 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (e.key === 'f' || e.key === 'F') {
             e.preventDefault();
-            const equipped = hotbar[activeHotbarIndex];
-            if (equipped && equipped.id === 'flashlight') {
-                toggleFlashlight();
-            } else if (equipped && equipped.id === 'hands' && !isBareHandsCharging) {
-                startBareHandsCharge();
-            }
+            toggleFlashlight();
             return;
         }
 
@@ -1061,8 +1085,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const cx = mapRenderX + campfire.x;
             const cy = mapRenderY + campfire.y;
 
-            const isFlashlightEquipped = hotbar[activeHotbarIndex] && hotbar[activeHotbarIndex].id === 'flashlight';
-            const isFlashlightActive = isFlashlightEquipped && isFlashlightOn && battery > 0;
+            const isMainFlashlightEquipped = hotbar[activeHotbarIndex] && hotbar[activeHotbarIndex].id === 'flashlight';
+            const isOffhandFlashlightEquipped = equipment[4] && equipment[4].id === 'flashlight';
+            const isFlashlightActive = (isMainFlashlightEquipped || isOffhandFlashlightEquipped) && isFlashlightOn && battery > 0;
 
             let playerBaseRadius = 1.8 * TILE_SIZE;
             if (isFlashlightActive) {
@@ -1262,7 +1287,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // HOTBAR & INVENTORY SYSTEM
+    // HOTBAR, INVENTORY & EQUIPMENT SYSTEM
     // -------------------------------------------------------------
     const ITEMS = {
         HANDS: { id: 'hands', name: '맨손', icon: '✊', locked: true },
@@ -1270,6 +1295,16 @@ document.addEventListener('DOMContentLoaded', () => {
         PHONE: { id: 'phone', name: '핸드폰', icon: '📱' }
     };
 
+    const EQUIP_SLOTS = [
+        { id: 'head', name: '머리', icon: '🧢' },
+        { id: 'body', name: '몸통', icon: '👕' },
+        { id: 'legs', name: '다리', icon: '👖' },
+        { id: 'feet', name: '신발', icon: '👟' },
+        { id: 'offhand', name: '보조손', icon: '🤝' },
+        { id: 'special', name: '특수', icon: '💎' }
+    ];
+
+    let equipment = [null, null, null, null, null, null];
     let hotbar = [
         { ...ITEMS.HANDS },
         { ...ITEMS.FLASHLIGHT },
@@ -1296,7 +1331,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function setEquippedSlot(index) {
         if (index >= 0 && index < 3) {
             activeHotbarIndex = index;
-            if (hotbar[activeHotbarIndex]?.id !== 'flashlight') {
+            if (hotbar[activeHotbarIndex]?.id !== 'flashlight' && equipment[4]?.id !== 'flashlight') {
                 isFlashlightOn = false;
             }
             if (hotbar[activeHotbarIndex]?.id !== 'hands') {
@@ -1305,6 +1340,51 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             renderAllUI();
         }
+    }
+
+    function renderEquipment() {
+        if (!equipmentGridEl) return;
+        equipmentGridEl.innerHTML = '';
+        EQUIP_SLOTS.forEach((slotDef, index) => {
+            const item = equipment[index];
+            const slotEl = document.createElement('div');
+            slotEl.className = 'item-slot equip-slot';
+            slotEl.dataset.container = 'equipment';
+            slotEl.dataset.index = index;
+
+            if (item) {
+                slotEl.setAttribute('draggable', 'true');
+
+                const iconEl = document.createElement('span');
+                iconEl.className = 'item-icon';
+                iconEl.textContent = item.icon;
+                slotEl.appendChild(iconEl);
+
+                const nameEl = document.createElement('span');
+                nameEl.className = 'item-name-tag';
+                nameEl.textContent = item.name;
+                slotEl.appendChild(nameEl);
+            } else {
+                // Render faint semi-transparent placeholder for empty equipment slot
+                const placeholderEl = document.createElement('div');
+                placeholderEl.className = 'equip-placeholder';
+                
+                const phIcon = document.createElement('span');
+                phIcon.className = 'equip-placeholder-icon';
+                phIcon.textContent = slotDef.icon;
+                placeholderEl.appendChild(phIcon);
+
+                const phLabel = document.createElement('span');
+                phLabel.className = 'equip-placeholder-label';
+                phLabel.textContent = slotDef.name;
+                placeholderEl.appendChild(phLabel);
+
+                slotEl.appendChild(placeholderEl);
+            }
+
+            attachSlotEvents(slotEl, 'equipment', index);
+            equipmentGridEl.appendChild(slotEl);
+        });
     }
 
     function renderHotbar() {
@@ -1390,11 +1470,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (isInventoryOpen && item && !item.locked) {
                     quickMoveItem('inventory', index);
                 }
+            } else if (container === 'equipment') {
+                const item = equipment[index];
+                if (isInventoryOpen && item) {
+                    quickMoveItem('equipment', index);
+                }
             }
         });
 
         slotEl.addEventListener('dragstart', (e) => {
-            const item = container === 'hotbar' ? hotbar[index] : inventory[index];
+            let item = null;
+            if (container === 'hotbar') item = hotbar[index];
+            else if (container === 'inventory') item = inventory[index];
+            else if (container === 'equipment') item = equipment[index];
+
             if (!item || item.locked) {
                 e.preventDefault();
                 return;
@@ -1444,9 +1533,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (emptyInvIndex !== -1) {
                 inventory[emptyInvIndex] = item;
                 hotbar[srcIndex] = null;
-                if (activeHotbarIndex === srcIndex) {
-                    isFlashlightOn = false;
-                }
                 renderAllUI();
             }
         } else if (srcContainer === 'inventory') {
@@ -1458,8 +1544,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 hotbar[emptyHotbarIndex] = item;
                 inventory[srcIndex] = null;
                 renderAllUI();
+            } else {
+                // Move to equipment offhand slot if free
+                if (equipment[4] === null) {
+                    equipment[4] = item;
+                    inventory[srcIndex] = null;
+                    renderAllUI();
+                }
+            }
+        } else if (srcContainer === 'equipment') {
+            const item = equipment[srcIndex];
+            if (!item) return;
+
+            const emptyInvIndex = inventory.findIndex(slot => slot === null);
+            if (emptyInvIndex !== -1) {
+                inventory[emptyInvIndex] = item;
+                equipment[srcIndex] = null;
+                renderAllUI();
             }
         }
+    }
+
+    function getItemFromContainer(container, idx) {
+        if (container === 'hotbar') return hotbar[idx];
+        if (container === 'inventory') return inventory[idx];
+        if (container === 'equipment') return equipment[idx];
+        return null;
+    }
+
+    function setItemInContainer(container, idx, item) {
+        if (container === 'hotbar') hotbar[idx] = item;
+        else if (container === 'inventory') inventory[idx] = item;
+        else if (container === 'equipment') equipment[idx] = item;
     }
 
     function swapItems(srcContainer, srcIdx, targetContainer, targetIdx) {
@@ -1467,14 +1583,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (srcContainer === 'hotbar' && srcIdx === 0) return;
         if (targetContainer === 'hotbar' && targetIdx === 0) return;
 
-        let srcItem = srcContainer === 'hotbar' ? hotbar[srcIdx] : inventory[srcIdx];
-        let targetItem = targetContainer === 'hotbar' ? hotbar[targetIdx] : inventory[targetIdx];
+        let srcItem = getItemFromContainer(srcContainer, srcIdx);
+        let targetItem = getItemFromContainer(targetContainer, targetIdx);
 
-        if (srcContainer === 'hotbar') hotbar[srcIdx] = targetItem;
-        else inventory[srcIdx] = targetItem;
-
-        if (targetContainer === 'hotbar') hotbar[targetIdx] = srcItem;
-        else inventory[targetIdx] = srcItem;
+        setItemInContainer(srcContainer, srcIdx, targetItem);
+        setItemInContainer(targetContainer, targetIdx, srcItem);
 
         renderAllUI();
     }
@@ -1490,6 +1603,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderAllUI() {
+        renderEquipment();
         renderHotbar();
         renderInventory();
         updateCamLockUI();
