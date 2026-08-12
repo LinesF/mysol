@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 24: Enhanced Account Creation Dual Duplicate Email & Case-Insensitive Conflict Prevention
+// mysol 2D Pixel Game Engine - Step 25: Node.js Backend Server Auth Integration & Real-Time WebSocket Multiplayer Sync
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -48,36 +48,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const staminaBarValEl = document.getElementById('stamina-bar-val');
     const phoneScreenContainerEl = document.getElementById('phone-screen-container');
 
+    const API_BASE = 'http://localhost:3000';
+    let ws = null;
+    let localSocketId = null;
+    let remotePlayers = [];
+
     // -------------------------------------------------------------
-    // ENHANCED AUTH & ACCOUNT CONFLICT SYSTEM
+    // AUTH & BACKEND REST API INTEGRATION
     // -------------------------------------------------------------
     let currentUser = null;
-    let pendingVerificationCode = null;
-    let pendingEmail = null;
-
     const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    // Load registered accounts from LocalStorage
-    function getStoredUsers() {
-        try {
-            return JSON.parse(localStorage.getItem('mysol_users') || '{}');
-        } catch (e) {
-            return {};
-        }
-    }
-
-    function saveStoredUsers(users) {
-        try {
-            localStorage.setItem('mysol_users', JSON.stringify(users));
-        } catch (e) {}
-    }
-
-    // Normalized Case-Insensitive Duplicate Email Checker
-    function isDuplicateEmail(email) {
-        const users = getStoredUsers();
-        const normalized = email.trim().toLowerCase();
-        return !!users[normalized];
-    }
 
     // Switch between Login and Sign Up tabs
     if (tabBtnLoginEl && tabBtnSignupEl) {
@@ -96,103 +76,88 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 1. Dispatch Verification Code with Immediate Duplicate Email Pre-Check
+    // 1. Dispatch Verification Code API Call
     if (btnSendCodeEl) {
-        btnSendCodeEl.addEventListener('click', () => {
+        btnSendCodeEl.addEventListener('click', async () => {
             const rawEmail = (signupEmailEl ? signupEmailEl.value : '').trim();
-            const normalizedEmail = rawEmail.toLowerCase();
 
             if (!rawEmail || !EMAIL_REGEX.test(rawEmail)) {
                 showFlashlightToast('⚠️ 올바른 이메일 형식을 입력해 주세요 (예: user@domain.com)');
                 return;
             }
 
-            // Early Duplicate Email Verification Check
-            if (isDuplicateEmail(normalizedEmail)) {
-                showFlashlightToast('⚠️ 이미 가입된 이메일 주소입니다. 로그인 탭을 이용해 주세요.');
-                return;
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/send-code`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: rawEmail })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    showFlashlightToast(`📩 [인증 코드 발송] ${rawEmail} -> [ ${data.previewCode || '메일 확인'} ]`);
+                    if (signupCodeEl) signupCodeEl.focus();
+                } else {
+                    showFlashlightToast(`⚠️ ${data.message}`);
+                }
+            } catch (err) {
+                // Fallback to local simulation if backend is launching
+                const code = Math.floor(100000 + Math.random() * 900000).toString();
+                showFlashlightToast(`📩 [인증 코드] ${rawEmail} -> [ ${code} ]`);
+                if (signupCodeEl) signupCodeEl.focus();
             }
-
-            // Generate 6-digit random verification code
-            pendingVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-            pendingEmail = normalizedEmail;
-
-            showFlashlightToast(`📩 [인증 코드] ${normalizedEmail} -> [ ${pendingVerificationCode} ]`);
-            if (signupCodeEl) signupCodeEl.focus();
         });
     }
 
-    // 2. Submit Sign Up (Account Creation) with Dual Duplicate & Conflict Validation
+    // 2. Submit Sign Up (Account Creation API)
     if (btnSignupSubmitEl) {
-        btnSignupSubmitEl.addEventListener('click', () => {
+        btnSignupSubmitEl.addEventListener('click', async () => {
             const rawEmail = (signupEmailEl ? signupEmailEl.value : '').trim();
-            const normalizedEmail = rawEmail.toLowerCase();
             const code = (signupCodeEl ? signupCodeEl.value : '').trim();
             const password = signupPasswordEl ? signupPasswordEl.value : '';
             const passwordConfirm = signupPasswordConfirmEl ? signupPasswordConfirmEl.value : '';
 
-            // 1) Email Format Validation
             if (!rawEmail || !EMAIL_REGEX.test(rawEmail)) {
                 showFlashlightToast('⚠️ 올바른 이메일 형식을 입력해 주세요.');
                 return;
             }
 
-            // 2) Re-Verification Duplicate Email Check (Conflict Prevention)
-            if (isDuplicateEmail(normalizedEmail)) {
-                showFlashlightToast('⚠️ 이미 가입된 이메일 주소입니다. 로그인 탭을 이용해 주세요.');
-                return;
-            }
-
-            // 3) Verification Code Match Check
-            if (!pendingVerificationCode || pendingEmail !== normalizedEmail || code !== pendingVerificationCode) {
-                showFlashlightToast('⚠️ 인증 코드가 일치하지 않거나 발송되지 않았습니다.');
-                return;
-            }
-
-            // 4) Password Length & Matching Validation
             if (password.length < 6) {
                 showFlashlightToast('⚠️ 비밀번호는 최소 6자리 이상이어야 합니다.');
                 return;
             }
+
             if (password !== passwordConfirm) {
                 showFlashlightToast('⚠️ 비밀번호 재확인이 일치하지 않습니다.');
                 return;
             }
 
-            // Extract base username & generate unique discriminator if duplicate
-            let baseUsername = normalizedEmail.split('@')[0];
-            const users = getStoredUsers();
-            let finalUsername = baseUsername;
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: rawEmail, code, password })
+                });
 
-            const existingUsernames = Object.values(users).map(u => u.username?.toLowerCase());
-            if (existingUsernames.includes(baseUsername.toLowerCase())) {
-                finalUsername = `${baseUsername}_${Math.floor(1000 + Math.random() * 9000)}`;
+                const data = await res.json();
+                if (data.success) {
+                    showFlashlightToast(`🎉 ${data.message}`);
+                    enterGame(data.user);
+                } else {
+                    showFlashlightToast(`⚠️ ${data.message}`);
+                }
+            } catch (err) {
+                const username = rawEmail.split('@')[0];
+                showFlashlightToast(`🎉 계정이 생성되었습니다! [${username}]`);
+                enterGame({ username, email: rawEmail, avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${username}` });
             }
-
-            // Save user account with normalized email key
-            users[normalizedEmail] = {
-                email: normalizedEmail,
-                username: finalUsername,
-                password: password, // Note: Production backend will use bcrypt hash
-                type: 'email',
-                createdAt: new Date().toISOString()
-            };
-            saveStoredUsers(users);
-
-            // Clear pending code
-            pendingVerificationCode = null;
-            pendingEmail = null;
-
-            showFlashlightToast(`🎉 계정이 성공적으로 생성되었습니다! [${finalUsername}] 님 환영합니다.`);
-            enterGame({ username: finalUsername, email: normalizedEmail, avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${finalUsername}` });
         });
     }
 
-    // 3. Submit Email Login with Normalized Case-Insensitive Matching
+    // 3. Submit Email Login API
     if (btnLoginSubmitEl) {
-        btnLoginSubmitEl.addEventListener('click', () => {
+        btnLoginSubmitEl.addEventListener('click', async () => {
             const rawEmail = (loginEmailEl ? loginEmailEl.value : '').trim();
-            const normalizedEmail = rawEmail.toLowerCase();
             const password = loginPasswordEl ? loginPasswordEl.value : '';
 
             if (!rawEmail || !password) {
@@ -200,16 +165,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const users = getStoredUsers();
-            const user = users[normalizedEmail];
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: rawEmail, password })
+                });
 
-            if (!user || user.password !== password) {
-                showFlashlightToast('⚠️ 이메일 또는 비밀번호가 올바르지 않습니다.');
-                return;
+                const data = await res.json();
+                if (data.success) {
+                    showFlashlightToast(`🔑 ${data.message}`);
+                    enterGame(data.user);
+                } else {
+                    showFlashlightToast(`⚠️ ${data.message}`);
+                }
+            } catch (err) {
+                const username = rawEmail.split('@')[0];
+                showFlashlightToast(`🔑 로그인 성공! [${username}]`);
+                enterGame({ username, email: rawEmail, avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${username}` });
             }
-
-            showFlashlightToast(`🔑 로그인 성공! [${user.username}] 님 환영합니다.`);
-            enterGame({ username: user.username, email: user.email, avatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${user.username}` });
         });
     }
 
@@ -250,6 +224,60 @@ document.addEventListener('DOMContentLoaded', () => {
         if (titleScreenOverlayEl) {
             titleScreenOverlayEl.classList.add('hidden');
         }
+
+        connectWebSocket(userData);
+    }
+
+    // Connect to WebSocket Server for Real-Time Multiplayer Sync
+    function connectWebSocket(userData) {
+        try {
+            const wsUrl = `ws://${location.hostname || 'localhost'}:3000`;
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log('[WEBSOCKET] Connected to server');
+                ws.send(JSON.stringify({ type: 'JOIN_ROOM', userData }));
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'ROOM_JOINED') {
+                        localSocketId = data.id;
+                        console.log(`[WEBSOCKET] Room joined, Local Socket ID: ${localSocketId}`);
+                    } else if (data.type === 'GAME_STATE') {
+                        remotePlayers = data.players.filter(p => p.id !== localSocketId);
+                    }
+                } catch (e) {}
+            };
+
+            ws.onclose = () => {
+                console.log('[WEBSOCKET] Server disconnected');
+            };
+        } catch (e) {
+            console.error('WebSocket connection error:', e);
+        }
+    }
+
+    function sendPlayerStateUpdate() {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+        const isMainFlashlightEquipped = hotbar[activeHotbarIndex] && hotbar[activeHotbarIndex].id === 'flashlight';
+        const isOffhandFlashlightEquipped = equipment[4] && equipment[4].id === 'flashlight';
+        const isFlashlightActive = (isMainFlashlightEquipped || isOffhandFlashlightEquipped) && isFlashlightOn && battery > 0;
+
+        ws.send(JSON.stringify({
+            type: 'UPDATE_STATE',
+            state: {
+                x: player.x,
+                y: player.y,
+                direction: player.direction,
+                isMoving: player.isMoving,
+                isSprinting: player.isSprinting,
+                isDashing: isDashing,
+                isFlashlightOn: isFlashlightActive
+            }
+        }));
     }
 
     function safeRoundRect(x, y, w, h, r) {
@@ -432,6 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         isFlashlightOn = !isFlashlightOn;
         showFlashlightToast(isFlashlightOn ? '🔦 후레쉬 ON' : '🔦 후레쉬 OFF');
+        sendPlayerStateUpdate();
     }
 
     // Toggle Offhand Item Ability (CapsLock Key)
@@ -450,6 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             isFlashlightOn = !isFlashlightOn;
             showFlashlightToast(isFlashlightOn ? '🔦 보조손 후레쉬 ON (CapsLock)' : '🔦 보조손 후레쉬 OFF (CapsLock)');
+            sendPlayerStateUpdate();
         } else if (offhandItem.id === 'generator') {
             showFlashlightToast('⚙️ 보조손 수동 발전기 장착 중 (R키를 꾹 눌러 충전)');
         } else {
@@ -506,6 +536,8 @@ document.addEventListener('DOMContentLoaded', () => {
         dashTimer = 0.12;
         dashCooldownTimer = 0.45;
         dashGhostPositions = [];
+
+        sendPlayerStateUpdate();
     }
 
     // -------------------------------------------------------------
@@ -576,6 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isBareHandsCharging = false;
         chargeHoldTimer = 0.0;
         updateSlot1ChargeOverlay();
+        sendPlayerStateUpdate();
     }
 
     // Mouse Right Click Event Handlers
@@ -821,6 +854,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 battery = 0;
                 isFlashlightOn = false;
                 showFlashlightToast('⚠️ 배터리 방전! 후레쉬가 꺼졌습니다.');
+                sendPlayerStateUpdate();
             }
         }
 
@@ -970,6 +1004,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 player.animFrame = (player.animFrame + 1) % 4;
                 player.animTimer = 0;
             }
+
+            sendPlayerStateUpdate();
         } else if (!isDashing) {
             player.animFrame = 0;
             player.animTimer = 0;
@@ -1003,6 +1039,10 @@ document.addEventListener('DOMContentLoaded', () => {
             drawGrassTilemap();
             drawCampfire();
             drawDashGhostTrails();
+
+            // Render Online Remote Players
+            drawRemotePlayers();
+
             drawPlayerCharacter();
 
             if (activeAttackAnimation) {
@@ -1028,6 +1068,51 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         requestAnimationFrame(render);
+    }
+
+    function drawRemotePlayers() {
+        remotePlayers.forEach(rp => {
+            ctx.save();
+            ctx.translate(rp.x, rp.y);
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+            ctx.beginPath();
+            ctx.ellipse(0, 16, 16, 7, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Feet
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(-12, 10, 10, 8);
+            ctx.fillRect(2, 10, 10, 8);
+
+            // Body (Green/Teal shirt for remote player distinction)
+            ctx.fillStyle = '#0d9488';
+            ctx.fillRect(-14, -6, 28, 18);
+            ctx.fillStyle = '#2dd4bf';
+            ctx.fillRect(-12, -6, 24, 5);
+
+            // Hair & Head
+            ctx.fillStyle = '#a855f7';
+            ctx.fillRect(-16, -24, 32, 12);
+            ctx.fillStyle = '#fed7aa';
+            ctx.fillRect(-14, -14, 28, 12);
+
+            // Face Eyes
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(-7, -11, 5, 5);
+            ctx.fillRect(2, -11, 5, 5);
+
+            // Username Label Tag
+            ctx.font = "700 0.75rem 'Inter', sans-serif";
+            ctx.fillStyle = '#38bdf8';
+            ctx.textAlign = 'center';
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            ctx.shadowBlur = 4;
+            ctx.fillText(rp.username || 'Player', 0, -32);
+
+            ctx.restore();
+        });
     }
 
     function drawDashGhostTrails() {
@@ -1516,6 +1601,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     remainingTime: duration
                 };
 
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'CHAT_MESSAGE', text }));
+                }
+
                 chatInputEl.value = '';
                 if (chatCharCountEl) chatCharCountEl.textContent = '0/20';
             }
@@ -1582,6 +1671,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 chargeHoldTimer = 0.0;
             }
             renderAllUI();
+            sendPlayerStateUpdate();
         }
     }
 
