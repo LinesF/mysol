@@ -62,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let verificationTimer = null;
     let countdownSeconds = 60;
     let lastSentEmail = '';
+    let latestGeneratedCode = '';
     let isEmailVerified = false;
 
     // Switch between Login and Sign Up tabs
@@ -173,6 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const data = await res.json();
                 if (data.success) {
+                    latestGeneratedCode = (data.previewCode || '').toString().trim();
                     showFlashlightToast(`📩 [인증 코드 발송] ${rawEmail} -> [ ${data.previewCode || '메일 확인'} ]`);
                     if (signupCodeEl) signupCodeEl.focus();
                     startVerificationCountdown();
@@ -181,6 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             } catch (err) {
                 const code = Math.floor(100000 + Math.random() * 900000).toString();
+                latestGeneratedCode = code;
                 showFlashlightToast(`📩 [인증 코드] ${rawEmail} -> [ ${code} ]`);
                 if (signupCodeEl) signupCodeEl.focus();
                 startVerificationCountdown();
@@ -231,19 +234,32 @@ document.addEventListener('DOMContentLoaded', () => {
                     showFlashlightToast('✅ 이메일 인증 성공! 이제 비밀번호를 천천히 입력해 주세요.');
                     if (signupPasswordEl) signupPasswordEl.focus();
                 } else {
+                    isEmailVerified = false;
                     showFlashlightToast(`⚠️ ${data.message}`);
                 }
             } catch (err) {
-                // Fallback validation
-                isEmailVerified = true;
-                resetVerificationTimer();
-                if (btnVerifyCodeEl) {
-                    btnVerifyCodeEl.textContent = '✅ 인증 완료';
-                    btnVerifyCodeEl.classList.add('verified-btn');
-                    btnVerifyCodeEl.disabled = true;
+                // Strict Local Verification Match Check
+                if (latestGeneratedCode && code === latestGeneratedCode) {
+                    isEmailVerified = true;
+                    resetVerificationTimer();
+                    if (btnVerifyCodeEl) {
+                        btnVerifyCodeEl.textContent = '✅ 인증 완료';
+                        btnVerifyCodeEl.classList.add('verified-btn');
+                        btnVerifyCodeEl.disabled = true;
+                    }
+                    if (btnSendCodeEl) {
+                        btnSendCodeEl.disabled = true;
+                        btnSendCodeEl.classList.add('disabled-btn');
+                    }
+                    if (signupEmailEl) signupEmailEl.disabled = true;
+                    if (signupCodeEl) signupCodeEl.disabled = true;
+
+                    showFlashlightToast('✅ 이메일 인증 완료! 비밀번호를 입력해 주세요.');
+                    if (signupPasswordEl) signupPasswordEl.focus();
+                } else {
+                    isEmailVerified = false;
+                    showFlashlightToast('⚠️ 인증 코드가 일치하지 않습니다. 메일로 전송된 6자리 코드를 다시 확인해 주세요.');
                 }
-                showFlashlightToast('✅ 이메일 인증 완료! 비밀번호를 입력해 주세요.');
-                if (signupPasswordEl) signupPasswordEl.focus();
             }
         });
     }
