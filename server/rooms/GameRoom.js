@@ -1,8 +1,8 @@
-// mysol 2D Pixel Game - Multi-Room Real-Time Multiplayer Room Manager
+// mysol 2D Pixel Game - Multi-Room Real-Time Multiplayer Room Manager with Global Lobby Support
 
 class Room {
     constructor(code, name, hostSocketId, isPrivate = false, password = '') {
-        this.code = code; // e.g. "#8492"
+        this.code = code; // e.g. "#8492" or "#0000"
         this.name = name || '생존자의 방';
         this.hostSocketId = hostSocketId;
         this.isPrivate = isPrivate;
@@ -17,13 +17,15 @@ class Room {
             id: socketId,
             username: userData.username || `Player_${socketId.slice(0, 4)}`,
             avatar: userData.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${socketId}`,
-            x: 400,
-            y: 480,
+            x: 400 + (Math.random() * 80 - 40),
+            y: 480 + (Math.random() * 80 - 40),
             direction: 'down',
             isMoving: false,
             isSprinting: false,
             isDashing: false,
-            isFlashlightOn: false
+            isFlashlightOn: false,
+            flashlightAngle: 0,
+            animFrame: 0
         };
 
         this.players.set(socketId, playerState);
@@ -61,6 +63,11 @@ class RoomManager {
     constructor() {
         this.rooms = new Map(); // roomCode -> Room
         this.playerRoomMap = new Map(); // socketId -> roomCode
+
+        // Create permanent Global Lobby Room #0000
+        const lobbyRoom = new Room('#0000', '대기실 (Lobby)', 'system', false, '');
+        lobbyRoom.maxPlayers = 50;
+        this.rooms.set('#0000', lobbyRoom);
     }
 
     generateCode() {
@@ -72,9 +79,17 @@ class RoomManager {
         return code;
     }
 
+    joinLobby(socketId, userData) {
+        this.leaveRoom(socketId, false);
+        const lobby = this.rooms.get('#0000');
+        lobby.addPlayer(socketId, userData);
+        this.playerRoomMap.set(socketId, '#0000');
+        console.log(`[ROOM_MANAGER] Player ${userData.username || socketId} entered Global Lobby #0000`);
+        return lobby;
+    }
+
     createRoom(hostSocketId, userData, name, isPrivate = false, password = '') {
-        // Leave existing room if any
-        this.leaveRoom(hostSocketId);
+        this.leaveRoom(hostSocketId, false);
 
         const code = this.generateCode();
         const room = new Room(code, name, hostSocketId, isPrivate, password);
@@ -90,7 +105,7 @@ class RoomManager {
     getPublicRooms() {
         const publicRooms = [];
         for (const room of this.rooms.values()) {
-            if (!room.isPrivate && room.players.size < room.maxPlayers) {
+            if (room.code !== '#0000' && !room.isPrivate && room.players.size < room.maxPlayers) {
                 publicRooms.push(room.getInfo());
             }
         }
@@ -118,7 +133,7 @@ class RoomManager {
             }
         }
 
-        this.leaveRoom(socketId);
+        this.leaveRoom(socketId, false);
         room.addPlayer(socketId, userData);
         this.playerRoomMap.set(socketId, room.code);
 
@@ -127,7 +142,7 @@ class RoomManager {
     }
 
     quickJoin(socketId, userData) {
-        const publicRooms = Array.from(this.rooms.values()).filter(r => !r.isPrivate && r.players.size < r.maxPlayers);
+        const publicRooms = Array.from(this.rooms.values()).filter(r => r.code !== '#0000' && !r.isPrivate && r.players.size < r.maxPlayers);
 
         if (publicRooms.length > 0) {
             const targetRoom = publicRooms[0];
@@ -138,7 +153,7 @@ class RoomManager {
         }
     }
 
-    leaveRoom(socketId) {
+    leaveRoom(socketId, autoReturnToLobby = true) {
         const roomCode = this.playerRoomMap.get(socketId);
         if (!roomCode) return null;
 
@@ -149,18 +164,25 @@ class RoomManager {
 
             console.log(`[ROOM_MANAGER] Player ${socketId} left room ${roomCode}`);
 
-            if (room.players.size === 0) {
-                this.rooms.delete(roomCode);
-                console.log(`[ROOM_MANAGER] Empty room deleted: ${roomCode}`);
-            } else if (room.hostSocketId === socketId) {
-                // Transfer host to first remaining player
-                const nextHostId = room.players.keys().next().value;
-                room.hostSocketId = nextHostId;
+            if (roomCode !== '#0000') {
+                if (room.players.size === 0) {
+                    this.rooms.delete(roomCode);
+                    console.log(`[ROOM_MANAGER] Empty room deleted: ${roomCode}`);
+                } else if (room.hostSocketId === socketId) {
+                    const nextHostId = room.players.keys().next().value;
+                    room.hostSocketId = nextHostId;
+                }
             }
-            return roomCode;
         }
-        this.playerRoomMap.delete(socketId);
-        return null;
+
+        if (autoReturnToLobby && roomCode !== '#0000') {
+            const lobby = this.rooms.get('#0000');
+            lobby.addPlayer(socketId, { username: 'Player' });
+            this.playerRoomMap.set(socketId, '#0000');
+            return '#0000';
+        }
+
+        return roomCode;
     }
 
     getPlayerRoom(socketId) {

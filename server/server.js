@@ -45,13 +45,25 @@ wss.on('connection', (ws) => {
         try {
             const data = JSON.parse(message);
 
-            if (data.type === 'GET_ROOM_LIST') {
+            if (data.type === 'JOIN_LOBBY') {
+                currentUserData = data.userData || { username: 'Player' };
+                const lobby = roomManager.joinLobby(socketId, currentUserData);
+
+                ws.send(JSON.stringify({
+                    type: 'ROOM_JOINED',
+                    id: socketId,
+                    roomInfo: lobby.getInfo()
+                }));
+                broadcastRoomState(lobby);
+
+            } else if (data.type === 'GET_ROOM_LIST') {
                 ws.send(JSON.stringify({
                     type: 'PUBLIC_ROOM_LIST',
                     rooms: roomManager.getPublicRooms()
                 }));
+
             } else if (data.type === 'CREATE_ROOM') {
-                currentUserData = data.userData || { username: 'Player' };
+                currentUserData = data.userData || currentUserData || { username: 'Player' };
                 const room = roomManager.createRoom(
                     socketId,
                     currentUserData,
@@ -68,7 +80,7 @@ wss.on('connection', (ws) => {
                 broadcastRoomState(room);
 
             } else if (data.type === 'JOIN_ROOM_BY_CODE') {
-                currentUserData = data.userData || { username: 'Player' };
+                currentUserData = data.userData || currentUserData || { username: 'Player' };
                 const result = roomManager.joinRoomByCode(
                     socketId,
                     currentUserData,
@@ -91,7 +103,7 @@ wss.on('connection', (ws) => {
                 }
 
             } else if (data.type === 'QUICK_JOIN') {
-                currentUserData = data.userData || { username: 'Player' };
+                currentUserData = data.userData || currentUserData || { username: 'Player' };
                 const result = roomManager.quickJoin(socketId, currentUserData);
 
                 if (result.success) {
@@ -109,12 +121,21 @@ wss.on('connection', (ws) => {
                 }
 
             } else if (data.type === 'LEAVE_ROOM') {
-                const roomCode = roomManager.leaveRoom(socketId);
-                ws.send(JSON.stringify({ type: 'ROOM_LEFT' }));
-                if (roomCode) {
-                    const room = roomManager.rooms.get(roomCode);
-                    if (room) broadcastRoomState(room);
+                const prevRoomCode = roomManager.playerRoomMap.get(socketId);
+                const newRoomCode = roomManager.leaveRoom(socketId, true);
+
+                if (prevRoomCode && prevRoomCode !== '#0000') {
+                    const prevRoom = roomManager.rooms.get(prevRoomCode);
+                    if (prevRoom) broadcastRoomState(prevRoom);
                 }
+
+                const lobby = roomManager.rooms.get('#0000');
+                ws.send(JSON.stringify({
+                    type: 'ROOM_LEFT',
+                    id: socketId,
+                    roomInfo: lobby.getInfo()
+                }));
+                broadcastRoomState(lobby);
 
             } else if (data.type === 'UPDATE_STATE') {
                 const room = roomManager.getPlayerRoom(socketId);
@@ -145,7 +166,8 @@ wss.on('connection', (ws) => {
     });
 
     ws.on('close', () => {
-        const roomCode = roomManager.leaveRoom(socketId);
+        const roomCode = roomManager.playerRoomMap.get(socketId);
+        roomManager.leaveRoom(socketId, false);
         if (roomCode) {
             const room = roomManager.rooms.get(roomCode);
             if (room) broadcastRoomState(room);

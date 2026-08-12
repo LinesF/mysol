@@ -476,7 +476,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
-                console.log('[WEBSOCKET] Connected to server');
+                console.log('[WEBSOCKET] Connected to server, joining Lobby #0000');
+                ws.send(JSON.stringify({ type: 'JOIN_LOBBY', userData }));
             };
 
             ws.onmessage = (event) => {
@@ -486,20 +487,31 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (data.type === 'ROOM_JOINED') {
                         localSocketId = data.id;
                         activeRoomInfo = data.roomInfo;
-                        showPhoneView('room-info');
                         updateActiveRoomInfoUI(activeRoomInfo);
-                        showFlashlightToast(`🏠 방에 입장했습니다: [${activeRoomInfo.code}]`);
+
+                        if (activeRoomInfo.code === '#0000') {
+                            showPhoneView('main');
+                            showFlashlightToast('🏠 대기실(로비)에 입장했습니다.');
+                        } else {
+                            showPhoneView('room-info');
+                            showFlashlightToast(`🏠 방에 입장했습니다: [${activeRoomInfo.code}]`);
+                        }
                     } else if (data.type === 'ROOM_LEFT') {
-                        activeRoomInfo = null;
+                        activeRoomInfo = data.roomInfo || null;
                         remotePlayers = [];
                         showPhoneView('main');
-                        showFlashlightToast('🚪 방에서 퇴장했습니다.');
+                        if (activeRoomInfo) updateActiveRoomInfoUI(activeRoomInfo);
+                        showFlashlightToast('🚪 방에서 퇴장하여 대기실로 이동했습니다.');
                     } else if (data.type === 'GAME_STATE') {
                         if (data.roomInfo) {
                             activeRoomInfo = data.roomInfo;
                             updateActiveRoomInfoUI(activeRoomInfo);
                         }
-                        remotePlayers = (data.players || []).filter(p => p.id !== localSocketId);
+                        if (localSocketId) {
+                            remotePlayers = (data.players || []).filter(p => p.id !== localSocketId);
+                        } else {
+                            remotePlayers = data.players || [];
+                        }
                     } else if (data.type === 'PUBLIC_ROOM_LIST') {
                         renderPublicRoomList(data.rooms || []);
                     } else if (data.type === 'ROOM_ERROR') {
