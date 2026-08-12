@@ -540,8 +540,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (phoneViewRoomInfoEl) phoneViewRoomInfoEl.classList.add('hidden');
 
         if (viewName === 'main' && phoneViewMainEl) {
-            if (activeRoomInfo) {
-                showPhoneView('room-info');
+            if (activeRoomInfo && activeRoomInfo.code && !activeRoomInfo.code.startsWith('#SOLO')) {
+                phoneViewRoomInfoEl.classList.remove('hidden');
             } else {
                 phoneViewMainEl.classList.remove('hidden');
             }
@@ -2156,6 +2156,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (hotbar[activeHotbarIndex]?.id !== 'hands') {
                 isBareHandsCharging = false;
                 chargeHoldTimer = 0.0;
+            }
+            if (hotbar[activeHotbarIndex]?.id === 'phone') {
+                showPhoneView('main');
             }
             renderAllUI();
             sendPlayerStateUpdate();
