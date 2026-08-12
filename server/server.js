@@ -139,6 +139,42 @@ wss.on('connection', (ws) => {
                     broadcastRoomState(soloRoom);
                 }
 
+            } else if (data.type === 'TOGGLE_READY') {
+                const room = roomManager.getPlayerRoom(socketId);
+                if (room && !room.code.startsWith('#SOLO')) {
+                    const player = room.players.get(socketId);
+                    if (player) {
+                        player.isReady = !player.isReady;
+                        broadcastRoomState(room);
+                    }
+                }
+
+            } else if (data.type === 'KICK_PLAYER') {
+                const result = roomManager.kickPlayer(socketId, data.targetSocketId);
+                if (result.success) {
+                    wss.clients.forEach((client) => {
+                        if (client.readyState === WebSocket.OPEN && client.socketId === data.targetSocketId) {
+                            const soloRoom = roomManager.getPlayerRoom(data.targetSocketId);
+                            client.send(JSON.stringify({
+                                type: 'KICKED_FROM_ROOM',
+                                id: data.targetSocketId,
+                                roomInfo: soloRoom ? soloRoom.getInfo() : null,
+                                message: '⚠️ 방장에 의해 강제 퇴장당했습니다.'
+                            }));
+                        }
+                    });
+                    broadcastRoomState(result.room);
+                } else {
+                    ws.send(JSON.stringify({ type: 'ROOM_ERROR', message: result.message }));
+                }
+
+            } else if (data.type === 'START_GAME') {
+                const room = roomManager.getPlayerRoom(socketId);
+                if (room && room.hostSocketId === socketId && !room.code.startsWith('#SOLO')) {
+                    room.isGameStarted = true;
+                    broadcastRoomState(room);
+                }
+
             } else if (data.type === 'UPDATE_STATE') {
                 const room = roomManager.getPlayerRoom(socketId);
                 if (room) {

@@ -84,6 +84,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const roomPlayerBadgesEl = document.getElementById('room-player-badges');
     const btnPhoneLeaveRoomEl = document.getElementById('btn-phone-leave-room');
 
+    const roomActionHudEl = document.getElementById('room-action-hud');
+    const hostActionGroupEl = document.getElementById('host-action-group');
+    const guestActionGroupEl = document.getElementById('guest-action-group');
+    const btnHostStartGameEl = document.getElementById('btn-host-start-game');
+    const hostReadyCountBadgeEl = document.getElementById('host-ready-count-badge');
+    const btnGuestReadyEl = document.getElementById('btn-guest-ready');
+
     const API_BASE = 'http://localhost:3000';
     let ws = null;
     let localSocketId = null;
@@ -500,9 +507,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     } else if (data.type === 'ROOM_LEFT') {
                         activeRoomInfo = data.roomInfo || null;
                         remotePlayers = [];
+                        remotePlayersMap.clear();
                         showPhoneView('main');
                         if (activeRoomInfo) updateActiveRoomInfoUI(activeRoomInfo);
                         showFlashlightToast('🚪 방에서 퇴장하여 개인 대기실로 이동했습니다.');
+                    } else if (data.type === 'KICKED_FROM_ROOM') {
+                        localSocketId = data.id;
+                        activeRoomInfo = data.roomInfo || null;
+                        remotePlayers = [];
+                        remotePlayersMap.clear();
+                        showPhoneView('main');
+                        if (activeRoomInfo) updateActiveRoomInfoUI(activeRoomInfo);
+                        showFlashlightToast(data.message || '⚠️ 방장에 의해 강제 퇴장당했습니다.');
                     } else if (data.type === 'GAME_STATE') {
                         if (data.roomInfo) {
                             activeRoomInfo = data.roomInfo;
@@ -727,6 +743,44 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function updateRoomHUDUI() {
+        if (!roomActionHudEl) return;
+
+        const isMultiRoom = activeRoomInfo && activeRoomInfo.code && !activeRoomInfo.code.startsWith('#SOLO');
+        if (!isMultiRoom) {
+            roomActionHudEl.classList.add('hidden');
+            return;
+        }
+
+        roomActionHudEl.classList.remove('hidden');
+        const isHost = activeRoomInfo.hostSocketId === localSocketId;
+
+        if (isHost) {
+            if (hostActionGroupEl) hostActionGroupEl.classList.remove('hidden');
+            if (guestActionGroupEl) guestActionGroupEl.classList.add('hidden');
+
+            const otherPlayers = (activeRoomInfo.players || []).filter(p => p.id !== localSocketId);
+            const readyCount = otherPlayers.filter(p => p.isReady).length;
+            if (hostReadyCountBadgeEl) {
+                hostReadyCountBadgeEl.textContent = `준비 완료: ${readyCount} / ${otherPlayers.length} 명`;
+            }
+        } else {
+            if (hostActionGroupEl) hostActionGroupEl.classList.add('hidden');
+            if (guestActionGroupEl) guestActionGroupEl.classList.remove('hidden');
+
+            const me = (activeRoomInfo.players || []).find(p => p.id === localSocketId);
+            if (btnGuestReadyEl) {
+                if (me && me.isReady) {
+                    btnGuestReadyEl.textContent = '❌ 준비 취소';
+                    btnGuestReadyEl.classList.add('is-ready');
+                } else {
+                    btnGuestReadyEl.textContent = '✋ 준비 완료';
+                    btnGuestReadyEl.classList.remove('is-ready');
+                }
+            }
+        }
+    }
+
     // Active Room Info UI Update
     function updateActiveRoomInfoUI(info) {
         if (!info) return;
@@ -735,18 +789,63 @@ document.addEventListener('DOMContentLoaded', () => {
         if (infoRoomPassEl) infoRoomPassEl.textContent = info.isPrivate ? `🔒 ${info.password}` : '🌐 공개 방';
         if (infoRoomCountEl) infoRoomCountEl.textContent = `${info.playerCount} / ${info.maxPlayers} 명`;
 
+        const isHost = info.hostSocketId === localSocketId;
+
         if (roomPlayerBadgesEl) {
             roomPlayerBadgesEl.innerHTML = '';
             (info.players || []).forEach(p => {
                 const badge = document.createElement('div');
                 badge.className = 'player-badge-item';
-                badge.innerHTML = `
-                    <span>${p.isHost ? '👑' : '👤'}</span>
-                    <span>${p.username}</span>
-                `;
+
+                const userInfo = document.createElement('div');
+                userInfo.className = 'badge-user-info';
+                userInfo.innerHTML = `<span>${p.isHost ? '👑' : '👤'}</span><span>${p.username}</span>`;
+
+                if (!p.isHost) {
+                    const readyTag = document.createElement('span');
+                    readyTag.className = `badge-ready-tag ${p.isReady ? 'ready' : 'not-ready'}`;
+                    readyTag.textContent = p.isReady ? '✋ 준비됨' : '대기중';
+                    userInfo.appendChild(readyTag);
+                }
+
+                badge.appendChild(userInfo);
+
+                // Add Kick button if local player is Host and target is NOT host
+                if (isHost && p.id !== localSocketId) {
+                    const kickBtn = document.createElement('button');
+                    kickBtn.className = 'kick-player-btn';
+                    kickBtn.textContent = '🚫 강퇴';
+                    kickBtn.addEventListener('click', () => {
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify({
+                                type: 'KICK_PLAYER',
+                                targetSocketId: p.id
+                            }));
+                        }
+                    });
+                    badge.appendChild(kickBtn);
+                }
+
                 roomPlayerBadgesEl.appendChild(badge);
             });
         }
+
+        updateRoomHUDUI();
+    }
+
+    if (btnHostStartGameEl) {
+        btnHostStartGameEl.addEventListener('click', () => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            ws.send(JSON.stringify({ type: 'START_GAME' }));
+            showFlashlightToast('🚀 게임이 시작되었습니다!');
+        });
+    }
+
+    if (btnGuestReadyEl) {
+        btnGuestReadyEl.addEventListener('click', () => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            ws.send(JSON.stringify({ type: 'TOGGLE_READY' }));
+        });
     }
 
     if (btnPhoneLeaveRoomEl) {

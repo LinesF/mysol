@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game - Multi-Room Manager with Personal Solo Lobby Support
+// mysol 2D Pixel Game - Multi-Room Manager with Personal Solo Lobby, Ready & Kick Support
 
 class Room {
     constructor(code, name, hostSocketId, isPrivate = false, password = '') {
@@ -10,6 +10,7 @@ class Room {
         this.maxPlayers = code.startsWith('#SOLO') ? 1 : 4;
         this.players = new Map(); // socketId -> playerState
         this.createdAt = Date.now();
+        this.isGameStarted = false;
     }
 
     addPlayer(socketId, userData) {
@@ -25,7 +26,8 @@ class Room {
             isDashing: false,
             isFlashlightOn: false,
             flashlightAngle: 0,
-            animFrame: 0
+            animFrame: 0,
+            isReady: false
         };
 
         this.players.set(socketId, playerState);
@@ -50,17 +52,20 @@ class Room {
         return {
             code: this.code,
             name: this.name,
+            hostSocketId: this.hostSocketId,
             isPrivate: this.isPrivate,
             isSoloLobby: this.code.startsWith('#SOLO'),
             playerCount: this.players.size,
             maxPlayers: this.maxPlayers,
             hasPassword: !!this.password,
             password: this.isPrivate ? this.password : '공개 방',
+            isGameStarted: this.isGameStarted,
             players: Array.from(this.players.values()).map(p => ({
                 id: p.id,
                 username: p.username,
                 avatar: p.avatar,
-                isHost: p.id === this.hostSocketId
+                isHost: p.id === this.hostSocketId,
+                isReady: p.isReady
             }))
         };
     }
@@ -188,6 +193,33 @@ class RoomManager {
         }
 
         return roomCode;
+    }
+
+    kickPlayer(hostSocketId, targetSocketId) {
+        const roomCode = this.playerRoomMap.get(hostSocketId);
+        if (!roomCode || roomCode.startsWith('#SOLO')) {
+            return { success: false, message: '유효한 멀티 방이 아닙니다.' };
+        }
+
+        const room = this.rooms.get(roomCode);
+        if (!room || room.hostSocketId !== hostSocketId) {
+            return { success: false, message: '방장만 참여자를 강제 퇴장시킬 수 있습니다.' };
+        }
+
+        if (hostSocketId === targetSocketId) {
+            return { success: false, message: '자기 자신은 강제 퇴장할 수 없습니다.' };
+        }
+
+        const targetPlayer = room.players.get(targetSocketId);
+        if (!targetPlayer) {
+            return { success: false, message: '해당 플레이어가 방에 존재하지 않습니다.' };
+        }
+
+        const targetUsername = targetPlayer.username;
+        this.leaveRoom(targetSocketId, true);
+
+        console.log(`[ROOM_MANAGER] Player ${targetUsername} (${targetSocketId}) was kicked by Host ${hostSocketId} from ${roomCode}`);
+        return { success: true, room, targetSocketId, targetUsername };
     }
 
     getPlayerRoom(socketId) {
