@@ -116,6 +116,16 @@ body {
     background: linear-gradient(90deg, #fbbf24, #d97706);
 }
 
+.bar-fill.yellow-fill.exhausted {
+    background: linear-gradient(90deg, #ef4444, #f97316) !important;
+    animation: exhaustedPulse 0.4s infinite alternate;
+}
+
+@keyframes exhaustedPulse {
+    from { opacity: 0.6; }
+    to { opacity: 1.0; }
+}
+
 .bar-fill.grey-fill {
     background: linear-gradient(90deg, #94a3b8, #64748b);
 }

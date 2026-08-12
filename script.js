@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 17 Fix: Bind Stamina Bar HUD IDs & Robust Shift Sprint Key Recognition
+// mysol 2D Pixel Game Engine - Step 18: Sprint & Advanced Stamina Exhaustion System (No Regen While Sprinting, Regen Delay, Yellow Vignette <=30, Dynamic 0-10 Exhaustion State)
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -103,8 +103,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let flashlightToastTimeout = null;
     let warningToastTimeout = null;
 
-    // Stamina System for Sprinting
+    // Advanced Stamina & Exhaustion System
     let stamina = 100.0;
+    let isExhausted = false;
+    let staminaRegenDelayTimer = 0.0; // Wait delay after stopping sprint before regen begins
+    let exhaustionTimer = 0.0;         // Exhaustion penalty timer
+    let lowestStaminaReached = 100.0;  // Tracks lowest stamina during sprint for dynamic penalty calculation
 
     // Bare Hands Combat & Cooldown System
     let isBareHandsCharging = false;
@@ -490,32 +494,79 @@ document.addEventListener('DOMContentLoaded', () => {
         const isShiftPressed = keys['shift'] || keys['Shift'] || keys['shiftleft'] || keys['shiftright'];
         player.isMoving = isWASD && (dx !== 0 || dy !== 0);
 
-        // Sprinting Logic with Stamina Drain & Recharge
-        if (player.isMoving && isShiftPressed && stamina > 0) {
+        // Sprint Execution Logic
+        const canSprint = player.isMoving && isShiftPressed && !isExhausted && stamina > 0;
+
+        if (canSprint) {
             player.isSprinting = true;
             player.speed = SPRINT_SPEED;
 
-            // Stamina Discharge while sprinting (discharges over ~5.5s)
+            // ABSOLUTELY NO STAMINA RECOVERY WHILE SPRINTING! ONLY DRAIN!
             stamina -= 18.0 * (1 / 60);
-            if (stamina < 0) stamina = 0;
+            if (stamina < lowestStaminaReached) {
+                lowestStaminaReached = stamina;
+            }
+
+            // Set delay timer so recovery waits after player stops sprinting
+            staminaRegenDelayTimer = 0.85;
+
+            // Exhaustion Trigger Check (Stamina 0 ~ 10)
+            if (stamina <= 10.0) {
+                isExhausted = true;
+                // Dynamic penalty: The closer stamina drops to 0, the longer exhaustion duration & regen delay!
+                const penaltyFactor = (10.0 - Math.max(0, stamina)) / 10.0; // 0.0 at 10 stamina, 1.0 at 0 stamina
+                exhaustionTimer = 1.8 + penaltyFactor * 2.5; // 1.8s to 4.3s exhaustion timer
+                staminaRegenDelayTimer = 1.0 + penaltyFactor * 1.5; // 1.0s to 2.5s regen delay
+            }
+
+            if (stamina <= 0) {
+                stamina = 0;
+                player.isSprinting = false;
+                player.speed = NORMAL_SPEED;
+            }
         } else {
             player.isSprinting = false;
             player.speed = NORMAL_SPEED;
 
-            // Stamina Recharge when not sprinting
-            if (player.isMoving) {
-                // Moving without shift (walking) -> Slow Recharge
-                stamina += 12.0 * (1 / 60);
-            } else {
-                // Completely still (idle) -> Faster Recharge
-                stamina += 28.0 * (1 / 60);
+            // Update Exhaustion Timer
+            if (isExhausted) {
+                exhaustionTimer -= 1 / 60;
+                if (exhaustionTimer <= 0 && stamina >= 25.0) {
+                    isExhausted = false;
+                }
             }
-            if (stamina > 100) stamina = 100;
+
+            // Update Stamina Regen Delay Timer
+            if (staminaRegenDelayTimer > 0) {
+                staminaRegenDelayTimer -= 1 / 60;
+            } else {
+                // Stamina Recovery (Only triggers after delay timer reaches 0!)
+                let baseRegenRate = player.isMoving ? 12.0 : 26.0;
+
+                // Slow down recovery during Exhaustion state
+                if (isExhausted) {
+                    const penaltyFactor = (10.0 - Math.max(0, lowestStaminaReached)) / 10.0;
+                    const slowMultiplier = Math.max(0.3, 0.65 - penaltyFactor * 0.35); // 0.3x to 0.65x speed
+                    baseRegenRate *= slowMultiplier;
+                }
+
+                stamina += baseRegenRate * (1 / 60);
+                if (stamina > 100.0) {
+                    stamina = 100.0;
+                    isExhausted = false;
+                    lowestStaminaReached = 100.0;
+                }
+            }
         }
 
-        // Update Orange Stamina Bar HUD Element
+        // Update Orange Stamina Bar HUD Element & Visual Exhausted Style
         if (staminaBarFillEl) {
             staminaBarFillEl.style.width = `${Math.max(0, Math.min(100, stamina))}%`;
+            if (isExhausted) {
+                staminaBarFillEl.classList.add('exhausted');
+            } else {
+                staminaBarFillEl.classList.remove('exhausted');
+            }
         }
         if (staminaBarValEl) {
             staminaBarValEl.textContent = Math.round(stamina);
@@ -588,12 +639,53 @@ document.addEventListener('DOMContentLoaded', () => {
             drawLightingOverlay(mapRenderX, mapRenderY);
             drawOffScreenCharacterArrow(mapRenderX, mapRenderY);
 
+            // Draw Screen Edge Yellow Vignette Overlay when Stamina <= 30
+            if (stamina <= 30.0) {
+                drawStaminaYellowVignette();
+            }
+
             update();
         } catch (err) {
             console.error('Render loop error:', err);
         }
 
         requestAnimationFrame(render);
+    }
+
+    // -------------------------------------------------------------
+    // YELLOW VIGNETTE SCREEN EDGE OVERLAY (Stamina <= 30)
+    // -------------------------------------------------------------
+    function drawStaminaYellowVignette() {
+        ctx.save();
+
+        const intensity = Math.min(1.0, (30.0 - stamina) / 30.0);
+        const pulse = isExhausted ? Math.sin(Date.now() * 0.009) * 0.1 : 0;
+        const finalAlpha = Math.max(0, Math.min(0.65, intensity * 0.55 + pulse));
+
+        const outerRadius = Math.max(width, height) * 0.7;
+        const innerRadius = Math.min(width, height) * 0.25;
+
+        const vignetteGrad = ctx.createRadialGradient(
+            width / 2, height / 2, innerRadius,
+            width / 2, height / 2, outerRadius
+        );
+
+        if (isExhausted) {
+            // Deeper amber/reddish-yellow pulse during exhaustion
+            vignetteGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            vignetteGrad.addColorStop(0.5, `rgba(234, 88, 12, ${finalAlpha * 0.4})`);
+            vignetteGrad.addColorStop(1, `rgba(220, 38, 38, ${finalAlpha * 0.85})`);
+        } else {
+            // Warm Amber Yellow vignette
+            vignetteGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            vignetteGrad.addColorStop(0.55, `rgba(245, 158, 11, ${finalAlpha * 0.35})`);
+            vignetteGrad.addColorStop(1, `rgba(234, 179, 8, ${finalAlpha * 0.75})`);
+        }
+
+        ctx.fillStyle = vignetteGrad;
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.restore();
     }
 
     function drawGrassTilemap() {
