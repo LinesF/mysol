@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 13: Bare Hands Normal Attack (F/Right Click) & 2-Second Charged AoE Attack with Hotbar Slot 1 Fill Overlay
+// mysol 2D Pixel Game Engine - Step 14: 0.5s Fast Charge Time & Attack Cooldown System to Prevent Spamming
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -97,10 +97,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let flashlightToastTimeout = null;
     let warningToastTimeout = null;
 
-    // Bare Hands Combat System (Normal vs 2-Second Heavy Charge Attack)
+    // Bare Hands Combat System (0.5s Fast Charge & Attack Cooldown System)
     let isBareHandsCharging = false;
-    let chargeHoldTimer = 0.0; // Seconds held (0.0s to 2.0s+)
-    let activeAttackAnimation = null; // { type: 'normal' | 'charged', angle: number, duration: number, remainingTime: number }
+    let chargeHoldTimer = 0.0; // Seconds held (0.0s to 0.5s)
+    let attackCooldownTimer = 0.0; // Cooldown timer to prevent attack spamming
+    let activeAttackAnimation = null;
 
     function showFlashlightToast(text) {
         if (!flashlightToastEl) return;
@@ -180,11 +181,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // -------------------------------------------------------------
-    // BARE HANDS ATTACK & CHARGE LOGIC (F / RIGHT CLICK)
+    // BARE HANDS ATTACK & CHARGE LOGIC (0.5s Charge & Cooldown)
     // -------------------------------------------------------------
     function startBareHandsCharge() {
         const equipped = hotbar[activeHotbarIndex];
         if (!equipped || equipped.id !== 'hands') return;
+
+        // Prevent attacking if currently on cooldown!
+        if (attackCooldownTimer > 0) return;
 
         isBareHandsCharging = true;
         chargeHoldTimer = 0.0;
@@ -192,19 +196,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function releaseBareHandsAttack() {
         if (!isBareHandsCharging) return;
+        if (attackCooldownTimer > 0) {
+            isBareHandsCharging = false;
+            chargeHoldTimer = 0.0;
+            updateSlot1ChargeOverlay();
+            return;
+        }
 
         const screenCenterX = width / 2;
         const screenCenterY = height / 2;
         const attackAngle = Math.atan2(mouseY - screenCenterY, mouseX - screenCenterX);
 
-        if (chargeHoldTimer >= 1.0) {
-            // Charged AoE Sector Attack!
+        if (chargeHoldTimer >= 0.5) {
+            // Charged AoE Sector Attack! (0.5s Fast Charge)
             activeAttackAnimation = {
                 type: 'charged',
                 angle: attackAngle,
                 totalDuration: 0.35,
                 remainingTime: 0.35
             };
+            attackCooldownTimer = 0.45; // 0.45s Cooldown after heavy charged attack
         } else {
             // Normal Front Melee Attack!
             activeAttackAnimation = {
@@ -213,6 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 totalDuration: 0.22,
                 remainingTime: 0.22
             };
+            attackCooldownTimer = 0.35; // 0.35s Cooldown after normal attack
         }
 
         isBareHandsCharging = false;
@@ -258,7 +270,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // F key trigger
         if (e.key === 'f' || e.key === 'F') {
             e.preventDefault();
             const equipped = hotbar[activeHotbarIndex];
@@ -330,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (isBareHandsCharging) {
-            const pct = Math.min(100, (chargeHoldTimer / 1.0) * 100);
+            const pct = Math.min(100, (chargeHoldTimer / 0.5) * 100);
             overlayEl.style.height = `${pct}%`;
             if (pct >= 100) {
                 overlayEl.classList.add('charged-ready');
@@ -353,6 +364,12 @@ document.addEventListener('DOMContentLoaded', () => {
             player.animTimer = 0;
             resetKeys();
             return;
+        }
+
+        // Attack Cooldown Update
+        if (attackCooldownTimer > 0) {
+            attackCooldownTimer -= 1 / 60;
+            if (attackCooldownTimer < 0) attackCooldownTimer = 0;
         }
 
         // Charge Timer Update
@@ -492,7 +509,6 @@ document.addEventListener('DOMContentLoaded', () => {
             drawCampfire();
             drawPlayerCharacter();
 
-            // Draw Bare Hands White Attack Range Effect
             if (activeAttackAnimation) {
                 drawAttackRangeIndicator(activeAttackAnimation);
             }
@@ -644,9 +660,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.restore();
     }
 
-    // -------------------------------------------------------------
-    // WHITE ATTACK RANGE INDICATOR (Normal Arc vs Charged AoE Sector)
-    // -------------------------------------------------------------
     function drawAttackRangeIndicator(attack) {
         const px = player.x;
         const py = player.y;
@@ -655,10 +668,9 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.translate(px, py);
 
         const progress = attack.remainingTime / attack.totalDuration;
-        const alpha = Math.sin(progress * Math.PI); // Smooth fade in/out
+        const alpha = Math.sin(progress * Math.PI);
 
         if (attack.type === 'normal') {
-            // Normal Attack: Crisp Front Melee Arc (75px radius, 70 deg arc)
             const radius = 75;
             const halfArc = Math.PI / 5;
 
@@ -675,7 +687,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.stroke();
 
         } else if (attack.type === 'charged') {
-            // Charged AoE Heavy Attack: Large White Sector Cone (145px radius, 120 deg arc)
             const radius = 145;
             const halfArc = Math.PI / 3;
 
