@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 21: 6-Slot Equipment System (Head, Body, Legs, Feet, Offhand, Special) & Offhand CapsLock Ability Toggle
+// mysol 2D Pixel Game Engine - Step 22: Hand-crank Generator Item (⚙️ 수동 발전기) & Halved Speed R-Key Battery Recharge Mechanics
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -197,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!hasFlashlight) return;
 
         if (battery <= 0) {
-            showFlashlightToast('⚠️ 배터리 부족! (R키를 꾹 눌러 충전하세요)');
+            showFlashlightToast('⚠️ 배터리 부족! (수동 발전기를 들고 R키로 충전하세요)');
             isFlashlightOn = false;
             return;
         }
@@ -208,7 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Toggle Offhand Item Ability (CapsLock Key)
     function toggleOffhandAbility() {
-        const offhandItem = equipment[4]; // Index 4 is Offhand
+        const offhandItem = equipment[4];
         if (!offhandItem) {
             showFlashlightToast('⚠️ 보조손에 사용 가능한 장비가 없습니다.');
             return;
@@ -216,12 +216,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (offhandItem.id === 'flashlight') {
             if (battery <= 0) {
-                showFlashlightToast('⚠️ 배터리 부족! (R키를 꾹 눌러 충전하세요)');
+                showFlashlightToast('⚠️ 배터리 부족! (수동 발전기를 들고 R키로 충전하세요)');
                 isFlashlightOn = false;
                 return;
             }
             isFlashlightOn = !isFlashlightOn;
             showFlashlightToast(isFlashlightOn ? '🔦 보조손 후레쉬 ON (CapsLock)' : '🔦 보조손 후레쉬 OFF (CapsLock)');
+        } else if (offhandItem.id === 'generator') {
+            showFlashlightToast('⚙️ 보조손 수동 발전기 장착 중 (R키를 꾹 눌러 충전)');
         } else {
             showFlashlightToast(`✨ 보조손 장비 [${offhandItem.name}] 장착 중`);
         }
@@ -386,7 +388,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // CapsLock Key Trigger Offhand Ability
         if (e.key === 'CapsLock') {
             e.preventDefault();
             toggleOffhandAbility();
@@ -564,11 +565,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Flashlight Battery Recharge & Discharge
-        const isRecharging = keys['r'] || keys['R'];
+        // Hand-crank Generator Battery Recharge Logic (R-Key hold while equipping Generator)
+        const isMainGeneratorEquipped = hotbar[activeHotbarIndex] && hotbar[activeHotbarIndex].id === 'generator';
+        const isOffhandGeneratorEquipped = equipment[4] && equipment[4].id === 'generator';
+        const hasGeneratorEquipped = isMainGeneratorEquipped || isOffhandGeneratorEquipped;
+
+        const isRecharging = (keys['r'] || keys['R']) && hasGeneratorEquipped;
 
         if (isRecharging) {
-            battery += (100 / 3) * (1 / 60);
+            // Halved battery recharge speed (full in 6 seconds = 100 / 6 % per second)
+            battery += (100 / 6) * (1 / 60);
             if (battery > 100) battery = 100;
             if (batteryBarFillEl) batteryBarFillEl.classList.add('recharging');
         } else {
@@ -1292,7 +1298,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const ITEMS = {
         HANDS: { id: 'hands', name: '맨손', icon: '✊', locked: true },
         FLASHLIGHT: { id: 'flashlight', name: '후레쉬', icon: '🔦' },
-        PHONE: { id: 'phone', name: '핸드폰', icon: '📱' }
+        PHONE: { id: 'phone', name: '핸드폰', icon: '📱' },
+        GENERATOR: { id: 'generator', name: '수동 발전기', icon: '⚙️' }
     };
 
     const EQUIP_SLOTS = [
@@ -1311,7 +1318,11 @@ document.addEventListener('DOMContentLoaded', () => {
         { ...ITEMS.PHONE }
     ];
 
-    let inventory = [null, null, null, null, null, null];
+    let inventory = [
+        { ...ITEMS.GENERATOR },
+        null, null, null, null, null
+    ];
+
     let activeHotbarIndex = 0;
     let dragSource = null;
 
@@ -1365,7 +1376,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 nameEl.textContent = item.name;
                 slotEl.appendChild(nameEl);
             } else {
-                // Render faint semi-transparent placeholder for empty equipment slot
                 const placeholderEl = document.createElement('div');
                 placeholderEl.className = 'equip-placeholder';
                 
@@ -1545,7 +1555,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 inventory[srcIndex] = null;
                 renderAllUI();
             } else {
-                // Move to equipment offhand slot if free
                 if (equipment[4] === null) {
                     equipment[4] = item;
                     inventory[srcIndex] = null;
