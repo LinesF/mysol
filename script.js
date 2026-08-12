@@ -197,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const screenCenterY = height / 2;
         const attackAngle = Math.atan2(mouseY - screenCenterY, mouseX - screenCenterX);
 
-        if (chargeHoldTimer >= 2.0) {
+        if (chargeHoldTimer >= 1.0) {
             // Charged AoE Sector Attack!
             activeAttackAnimation = {
                 type: 'charged',
@@ -330,7 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (isBareHandsCharging) {
-            const pct = Math.min(100, (chargeHoldTimer / 2.0) * 100);
+            const pct = Math.min(100, (chargeHoldTimer / 1.0) * 100);
             overlayEl.style.height = `${pct}%`;
             if (pct >= 100) {
                 overlayEl.classList.add('charged-ready');
