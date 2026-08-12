@@ -735,6 +735,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const isOffhandFlashlightEquipped = equipment[4] && equipment[4].id === 'flashlight';
         const isFlashlightActive = (isMainFlashlightEquipped || isOffhandFlashlightEquipped) && isFlashlightOn && battery > 0;
 
+        const screenCenterX = width / 2;
+        const screenCenterY = height / 2;
+        const currentAimAngle = Math.atan2(mouseY - screenCenterY, mouseX - screenCenterX);
+
         ws.send(JSON.stringify({
             type: 'UPDATE_STATE',
             state: {
@@ -744,7 +748,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 isMoving: player.isMoving,
                 isSprinting: player.isSprinting,
                 isDashing: isDashing,
-                isFlashlightOn: isFlashlightActive
+                animFrame: player.animFrame,
+                isFlashlightOn: isFlashlightActive,
+                flashlightAngle: currentAimAngle
             }
         }));
     }
@@ -1507,9 +1513,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function drawRemotePlayers() {
         remotePlayers.forEach(rp => {
-            ctx.save();
-            ctx.translate(rp.x, rp.y);
+            const bounceY = (rp.isMoving && ((rp.animFrame || 0) % 2 === 1)) ? (rp.isSprinting ? -5 : -3) : 0;
 
+            ctx.save();
+            ctx.translate(rp.x, rp.y + bounceY);
+
+            // Shadow
             ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
             ctx.beginPath();
             ctx.ellipse(0, 16, 16, 7, 0, 0, Math.PI * 2);
