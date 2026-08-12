@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 19: Space Key Quick Dash Skill (10 Stamina Cost, Ultra-Fast Burst Speed & Motion Blur Ghost Trail)
+// mysol 2D Pixel Game Engine - Step 20: Bare Hands Attack Stamina Costs (Normal Attack -3 Stamina, Fully Charged Heavy Attack -5 Stamina)
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let dashTimer = 0.0;
     let dashCooldownTimer = 0.0;
     const dashVector = { x: 0, y: 0 };
-    let dashGhostPositions = []; // Motion blur ghost positions
+    let dashGhostPositions = [];
 
     // Bare Hands Combat & Cooldown System
     let isBareHandsCharging = false;
@@ -209,7 +209,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isDashing || dashCooldownTimer > 0) return;
         if (isExhausted || stamina < 10.0) return;
 
-        // Determine dash direction (movement keys or facing direction)
         let vx = 0;
         let vy = 0;
 
@@ -250,18 +249,19 @@ document.addEventListener('DOMContentLoaded', () => {
         staminaRegenDelayTimer = 0.95;
 
         isDashing = true;
-        dashTimer = 0.12; // 0.12s ultra-fast burst duration
-        dashCooldownTimer = 0.45; // 0.45s cooldown
+        dashTimer = 0.12;
+        dashCooldownTimer = 0.45;
         dashGhostPositions = [];
     }
 
     // -------------------------------------------------------------
-    // BARE HANDS ATTACK & CHARGE LOGIC
+    // BARE HANDS ATTACK & CHARGE LOGIC (Normal -3 Stamina, Heavy -5 Stamina)
     // -------------------------------------------------------------
     function startBareHandsCharge() {
         const equipped = hotbar[activeHotbarIndex];
         if (!equipped || equipped.id !== 'hands') return;
         if (attackCooldownTimer > 0) return;
+        if (isExhausted || stamina < 3.0) return; // Requires at least 3 stamina & not exhausted
 
         isBareHandsCharging = true;
         chargeHoldTimer = 0.0;
@@ -281,6 +281,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const attackAngle = Math.atan2(mouseY - screenCenterY, mouseX - screenCenterX);
 
         if (chargeHoldTimer >= 0.5) {
+            // Fully Charged Heavy Attack -> Consumes 5 Stamina!
+            stamina -= 5.0;
+
             activeAttackAnimation = {
                 type: 'charged',
                 angle: attackAngle,
@@ -290,6 +293,9 @@ document.addEventListener('DOMContentLoaded', () => {
             attackCooldownTimer = 0.45;
             maxAttackCooldownDuration = 0.45;
         } else {
+            // Normal Melee Attack -> Consumes 3 Stamina!
+            stamina -= 3.0;
+
             activeAttackAnimation = {
                 type: 'normal',
                 angle: attackAngle,
@@ -299,6 +305,21 @@ document.addEventListener('DOMContentLoaded', () => {
             attackCooldownTimer = 0.35;
             maxAttackCooldownDuration = 0.35;
         }
+
+        if (stamina < lowestStaminaReached) {
+            lowestStaminaReached = stamina;
+        }
+
+        staminaRegenDelayTimer = 0.75;
+
+        if (stamina <= 10.0) {
+            isExhausted = true;
+            const penaltyFactor = (10.0 - Math.max(0, stamina)) / 10.0;
+            exhaustionTimer = 1.8 + penaltyFactor * 2.5;
+            staminaRegenDelayTimer = 1.0 + penaltyFactor * 1.5;
+        }
+
+        if (stamina < 0) stamina = 0;
 
         isBareHandsCharging = false;
         chargeHoldTimer = 0.0;
@@ -343,7 +364,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Space Key Quick Dash Trigger
         if (e.key === ' ' || e.code === 'Space') {
             e.preventDefault();
             triggerQuickDash();
@@ -479,7 +499,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isDashing) {
             dashTimer -= 1 / 60;
             
-            // Save current position for ghost trail
             dashGhostPositions.push({ x: player.x, y: player.y, direction: player.direction, alpha: 0.6 });
             if (dashGhostPositions.length > 5) dashGhostPositions.shift();
 
@@ -495,7 +514,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // Fade out ghost trails
         dashGhostPositions.forEach(ghost => {
             ghost.alpha -= 0.08;
         });
@@ -551,7 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
             batteryBarValEl.textContent = Math.round(battery);
         }
 
-        // WASD Movement & Sprint Logic (Skipped during active dash)
+        // WASD Movement & Sprint Logic
         let isWASD = false;
         let dx = 0;
         let dy = 0;
@@ -670,7 +688,7 @@ document.addEventListener('DOMContentLoaded', () => {
             staminaBarValEl.textContent = Math.round(stamina);
         }
 
-        // Move Player Position (Standard WASD)
+        // Move Player Position
         if (player.isMoving && !isDashing) {
             if (dx !== 0 && dy !== 0) {
                 dx *= 0.7071;
@@ -722,10 +740,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             drawGrassTilemap();
             drawCampfire();
-            
-            // Draw Motion Blur Ghost Trails for Quick Dash Skill
             drawDashGhostTrails();
-            
             drawPlayerCharacter();
 
             if (activeAttackAnimation) {
@@ -753,7 +768,6 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(render);
     }
 
-    // Draw Motion Blur Ghost Trails during Quick Dash
     function drawDashGhostTrails() {
         dashGhostPositions.forEach(ghost => {
             ctx.save();
@@ -770,9 +784,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // -------------------------------------------------------------
-    // YELLOW VIGNETTE SCREEN EDGE OVERLAY (Stamina <= 30)
-    // -------------------------------------------------------------
     function drawStaminaYellowVignette() {
         ctx.save();
 
