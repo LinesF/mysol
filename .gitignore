@@ -1,0 +1,11 @@
+# Environment secrets
+.env
+server/.env
+*.env
+
+# Node modules
+node_modules/
+server/node_modules/
+
+# Database files
+server/mysol_db.json

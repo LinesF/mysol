@@ -40,7 +40,7 @@ wss.on('connection', (ws) => {
     const socketId = Math.random().toString(36).substring(2, 9);
     let playerState = null;
 
-    ws.onmessage = (message) => {
+    ws.on('message', (message) => {
         try {
             const data = JSON.parse(message);
 
@@ -69,7 +69,7 @@ wss.on('connection', (ws) => {
         }
     });
 
-    ws.onclose = () => {
+    ws.on('close', () => {
         gameRoom.removePlayer(socketId);
         broadcastGameState();
     });
@@ -91,10 +91,12 @@ server.listen(PORT, () => {
     console.log(`🚀 mysol 2D Pixel Game Server running on port ${PORT}`);
     console.log(`🌐 HTTP Auth & Static Server: http://localhost:${PORT}`);
     console.log(`⚡ WebSocket Multiplayer Endpoint: ws://localhost:${PORT}`);
-    if (process.env.SMTP_USER) {
+    if (process.env.RESEND_API_KEY) {
+        console.log(`✉️ Real Email API: Resend Enabled (Key: ${process.env.RESEND_API_KEY.slice(0, 8)}...)`);
+    } else if (process.env.SMTP_USER) {
         console.log(`📧 Real Email SMTP Configured: [ ${process.env.SMTP_USER} ]`);
     } else {
-        console.log(`💡 Real Email SMTP: Not configured (Using Console Preview). Create server/.env to enable real email dispatch!`);
+        console.log(`💡 Real Email API: Not configured (Using Console Preview)`);
     }
     console.log(`======================================================\n`);
 });
