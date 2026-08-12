@@ -489,9 +489,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         activeRoomInfo = data.roomInfo;
                         updateActiveRoomInfoUI(activeRoomInfo);
 
-                        if (activeRoomInfo.code === '#0000') {
+                        if (activeRoomInfo.code.startsWith('#SOLO')) {
                             showPhoneView('main');
-                            showFlashlightToast('🏠 대기실(로비)에 입장했습니다.');
+                            showFlashlightToast('🏠 개인 대기실에 입장했습니다.');
                         } else {
                             showPhoneView('room-info');
                             showFlashlightToast(`🏠 방에 입장했습니다: [${activeRoomInfo.code}]`);
@@ -501,7 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         remotePlayers = [];
                         showPhoneView('main');
                         if (activeRoomInfo) updateActiveRoomInfoUI(activeRoomInfo);
-                        showFlashlightToast('🚪 방에서 퇴장하여 대기실로 이동했습니다.');
+                        showFlashlightToast('🚪 방에서 퇴장하여 개인 대기실로 이동했습니다.');
                     } else if (data.type === 'GAME_STATE') {
                         if (data.roomInfo) {
                             activeRoomInfo = data.roomInfo;
@@ -744,7 +744,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function sendPlayerStateUpdate(force = false) {
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
-        if (!activeRoomInfo) return; // Only send when in an active room
+        if (!activeRoomInfo || activeRoomInfo.code.startsWith('#SOLO')) return; // Only send in multi-player room
 
         const now = Date.now();
         // Throttle updates to ~30fps (33ms) unless forced
@@ -805,6 +805,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const rect = canvas.getBoundingClientRect();
         mouseX = e.clientX - rect.left;
         mouseY = e.clientY - rect.top;
+
+        if (isFlashlightOn) {
+            sendPlayerStateUpdate();
+        }
     });
 
     function resizeCanvas() {
@@ -1017,7 +1021,7 @@ document.addEventListener('DOMContentLoaded', () => {
         dashCooldownTimer = 0.45;
         dashGhostPositions = [];
 
-        sendPlayerStateUpdate();
+        sendPlayerStateUpdate(true);
     }
 
     function startBareHandsCharge() {
@@ -1085,7 +1089,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isBareHandsCharging = false;
         chargeHoldTimer = 0.0;
         updateSlot1ChargeOverlay();
-        sendPlayerStateUpdate();
+        sendPlayerStateUpdate(true);
     }
 
     window.addEventListener('contextmenu', (e) => {
@@ -1324,7 +1328,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 battery = 0;
                 isFlashlightOn = false;
                 showFlashlightToast('⚠️ 배터리 방전! 후레쉬가 꺼졌습니다.');
-                sendPlayerStateUpdate();
+                sendPlayerStateUpdate(true);
             }
         }
 
@@ -1534,10 +1538,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function drawRemotePlayers() {
         remotePlayers.forEach(rp => {
+            // Smooth 60fps Position Lerp (Interpolation)
+            if (rp.renderX === undefined) rp.renderX = rp.x;
+            if (rp.renderY === undefined) rp.renderY = rp.y;
+            rp.renderX += (rp.x - rp.renderX) * 0.35;
+            rp.renderY += (rp.y - rp.renderY) * 0.35;
+
+            // Render Remote Player Dash Ghost Trails
+            if (rp.isDashing) {
+                if (!rp.dashGhosts) rp.dashGhosts = [];
+                rp.dashGhosts.push({ x: rp.renderX, y: rp.renderY, alpha: 0.6 });
+                if (rp.dashGhosts.length > 4) rp.dashGhosts.shift();
+            }
+            if (rp.dashGhosts && rp.dashGhosts.length > 0) {
+                rp.dashGhosts.forEach(g => {
+                    ctx.save();
+                    ctx.translate(g.x, g.y);
+                    ctx.globalAlpha = g.alpha;
+                    ctx.fillStyle = 'rgba(56, 189, 248, 0.4)';
+                    ctx.fillRect(-14, -14, 28, 24);
+                    ctx.restore();
+                    g.alpha -= 0.08;
+                });
+                rp.dashGhosts = rp.dashGhosts.filter(g => g.alpha > 0);
+            }
+
             const bounceY = (rp.isMoving && ((rp.animFrame || 0) % 2 === 1)) ? (rp.isSprinting ? -5 : -3) : 0;
 
             ctx.save();
-            ctx.translate(rp.x, rp.y + bounceY);
+            ctx.translate(rp.renderX, rp.renderY + bounceY);
 
             // Shadow
             ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';

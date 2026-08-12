@@ -47,14 +47,14 @@ wss.on('connection', (ws) => {
 
             if (data.type === 'JOIN_LOBBY') {
                 currentUserData = data.userData || { username: 'Player' };
-                const lobby = roomManager.joinLobby(socketId, currentUserData);
+                const soloRoom = roomManager.joinPersonalLobby(socketId, currentUserData);
 
                 ws.send(JSON.stringify({
                     type: 'ROOM_JOINED',
                     id: socketId,
-                    roomInfo: lobby.getInfo()
+                    roomInfo: soloRoom.getInfo()
                 }));
-                broadcastRoomState(lobby);
+                broadcastRoomState(soloRoom);
 
             } else if (data.type === 'GET_ROOM_LIST') {
                 ws.send(JSON.stringify({
@@ -122,20 +122,22 @@ wss.on('connection', (ws) => {
 
             } else if (data.type === 'LEAVE_ROOM') {
                 const prevRoomCode = roomManager.playerRoomMap.get(socketId);
-                const newRoomCode = roomManager.leaveRoom(socketId, true);
+                const soloCode = roomManager.leaveRoom(socketId, true);
 
-                if (prevRoomCode && prevRoomCode !== '#0000') {
+                if (prevRoomCode && !prevRoomCode.startsWith('#SOLO')) {
                     const prevRoom = roomManager.rooms.get(prevRoomCode);
                     if (prevRoom) broadcastRoomState(prevRoom);
                 }
 
-                const lobby = roomManager.rooms.get('#0000');
-                ws.send(JSON.stringify({
-                    type: 'ROOM_LEFT',
-                    id: socketId,
-                    roomInfo: lobby.getInfo()
-                }));
-                broadcastRoomState(lobby);
+                const soloRoom = roomManager.rooms.get(soloCode);
+                if (soloRoom) {
+                    ws.send(JSON.stringify({
+                        type: 'ROOM_LEFT',
+                        id: socketId,
+                        roomInfo: soloRoom.getInfo()
+                    }));
+                    broadcastRoomState(soloRoom);
+                }
 
             } else if (data.type === 'UPDATE_STATE') {
                 const room = roomManager.getPlayerRoom(socketId);

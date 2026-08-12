@@ -1,13 +1,13 @@
-// mysol 2D Pixel Game - Multi-Room Real-Time Multiplayer Room Manager with Global Lobby Support
+// mysol 2D Pixel Game - Multi-Room Manager with Personal Solo Lobby Support
 
 class Room {
     constructor(code, name, hostSocketId, isPrivate = false, password = '') {
-        this.code = code; // e.g. "#8492" or "#0000"
+        this.code = code; // e.g. "#8492" or "#SOLO"
         this.name = name || '생존자의 방';
         this.hostSocketId = hostSocketId;
         this.isPrivate = isPrivate;
         this.password = password ? password.trim() : '';
-        this.maxPlayers = 4;
+        this.maxPlayers = code.startsWith('#SOLO') ? 1 : 4;
         this.players = new Map(); // socketId -> playerState
         this.createdAt = Date.now();
     }
@@ -17,8 +17,8 @@ class Room {
             id: socketId,
             username: userData.username || `Player_${socketId.slice(0, 4)}`,
             avatar: userData.avatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${socketId}`,
-            x: 400 + (Math.random() * 80 - 40),
-            y: 480 + (Math.random() * 80 - 40),
+            x: 400,
+            y: 480,
             direction: 'down',
             isMoving: false,
             isSprinting: false,
@@ -45,6 +45,7 @@ class Room {
             code: this.code,
             name: this.name,
             isPrivate: this.isPrivate,
+            isSoloLobby: this.code.startsWith('#SOLO'),
             playerCount: this.players.size,
             maxPlayers: this.maxPlayers,
             hasPassword: !!this.password,
@@ -63,11 +64,6 @@ class RoomManager {
     constructor() {
         this.rooms = new Map(); // roomCode -> Room
         this.playerRoomMap = new Map(); // socketId -> roomCode
-
-        // Create permanent Global Lobby Room #0000
-        const lobbyRoom = new Room('#0000', '대기실 (Lobby)', 'system', false, '');
-        lobbyRoom.maxPlayers = 50;
-        this.rooms.set('#0000', lobbyRoom);
     }
 
     generateCode() {
@@ -79,13 +75,16 @@ class RoomManager {
         return code;
     }
 
-    joinLobby(socketId, userData) {
+    joinPersonalLobby(socketId, userData) {
         this.leaveRoom(socketId, false);
-        const lobby = this.rooms.get('#0000');
-        lobby.addPlayer(socketId, userData);
-        this.playerRoomMap.set(socketId, '#0000');
-        console.log(`[ROOM_MANAGER] Player ${userData.username || socketId} entered Global Lobby #0000`);
-        return lobby;
+        const soloCode = `#SOLO_${socketId}`;
+        const soloRoom = new Room(soloCode, '개인 로비', socketId, true, '');
+        soloRoom.addPlayer(socketId, userData);
+
+        this.rooms.set(soloCode, soloRoom);
+        this.playerRoomMap.set(socketId, soloCode);
+        console.log(`[ROOM_MANAGER] Player ${userData.username || socketId} entered Personal Solo Lobby ${soloCode}`);
+        return soloRoom;
     }
 
     createRoom(hostSocketId, userData, name, isPrivate = false, password = '') {
@@ -105,7 +104,7 @@ class RoomManager {
     getPublicRooms() {
         const publicRooms = [];
         for (const room of this.rooms.values()) {
-            if (room.code !== '#0000' && !room.isPrivate && room.players.size < room.maxPlayers) {
+            if (!room.code.startsWith('#SOLO') && !room.isPrivate && room.players.size < room.maxPlayers) {
                 publicRooms.push(room.getInfo());
             }
         }
@@ -119,7 +118,7 @@ class RoomManager {
         }
 
         const room = this.rooms.get(formattedCode);
-        if (!room) {
+        if (!room || room.code.startsWith('#SOLO')) {
             return { success: false, message: '존재하지 않는 방 번호입니다.' };
         }
 
@@ -142,7 +141,7 @@ class RoomManager {
     }
 
     quickJoin(socketId, userData) {
-        const publicRooms = Array.from(this.rooms.values()).filter(r => r.code !== '#0000' && !r.isPrivate && r.players.size < r.maxPlayers);
+        const publicRooms = Array.from(this.rooms.values()).filter(r => !r.code.startsWith('#SOLO') && !r.isPrivate && r.players.size < r.maxPlayers);
 
         if (publicRooms.length > 0) {
             const targetRoom = publicRooms[0];
@@ -164,22 +163,22 @@ class RoomManager {
 
             console.log(`[ROOM_MANAGER] Player ${socketId} left room ${roomCode}`);
 
-            if (roomCode !== '#0000') {
-                if (room.players.size === 0) {
-                    this.rooms.delete(roomCode);
-                    console.log(`[ROOM_MANAGER] Empty room deleted: ${roomCode}`);
-                } else if (room.hostSocketId === socketId) {
-                    const nextHostId = room.players.keys().next().value;
-                    room.hostSocketId = nextHostId;
-                }
+            if (room.players.size === 0) {
+                this.rooms.delete(roomCode);
+                console.log(`[ROOM_MANAGER] Empty room deleted: ${roomCode}`);
+            } else if (room.hostSocketId === socketId) {
+                const nextHostId = room.players.keys().next().value;
+                room.hostSocketId = nextHostId;
             }
         }
 
-        if (autoReturnToLobby && roomCode !== '#0000') {
-            const lobby = this.rooms.get('#0000');
-            lobby.addPlayer(socketId, { username: 'Player' });
-            this.playerRoomMap.set(socketId, '#0000');
-            return '#0000';
+        if (autoReturnToLobby && (!roomCode || !roomCode.startsWith('#SOLO'))) {
+            const soloCode = `#SOLO_${socketId}`;
+            const soloRoom = new Room(soloCode, '개인 로비', socketId, true, '');
+            soloRoom.addPlayer(socketId, { username: 'Player' });
+            this.rooms.set(soloCode, soloRoom);
+            this.playerRoomMap.set(socketId, soloCode);
+            return soloCode;
         }
 
         return roomCode;
