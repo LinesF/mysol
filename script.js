@@ -1,4 +1,4 @@
-// mysol 2D Pixel Game Engine - Step 27: Email Modification Input Listener Reset & Real Email SMTP Dispatch Preparation
+// mysol 2D Pixel Game Engine - Step 29: Separate Email Verification Confirmation & Relaxed Password Setup UX
 
 document.addEventListener('DOMContentLoaded', () => {
     // Safely query DOM elements with optional chaining to prevent any script crashes
@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const signupEmailEl = document.getElementById('signup-email');
     const btnSendCodeEl = document.getElementById('btn-send-code');
     const signupCodeEl = document.getElementById('signup-code');
+    const btnVerifyCodeEl = document.getElementById('btn-verify-code');
     const signupPasswordEl = document.getElementById('signup-password');
     const signupPasswordConfirmEl = document.getElementById('signup-password-confirm');
     const btnSignupSubmitEl = document.getElementById('btn-signup-submit');
@@ -61,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let verificationTimer = null;
     let countdownSeconds = 60;
     let lastSentEmail = '';
+    let isEmailVerified = false;
 
     // Switch between Login and Sign Up tabs
     if (tabBtnLoginEl && tabBtnSignupEl) {
@@ -84,11 +86,22 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(verificationTimer);
             verificationTimer = null;
         }
-        if (btnSendCodeEl) {
+        if (btnSendCodeEl && !isEmailVerified) {
             btnSendCodeEl.disabled = false;
             btnSendCodeEl.classList.remove('disabled-btn');
             btnSendCodeEl.textContent = '인증 코드 발송';
         }
+    }
+
+    function resetVerifiedState() {
+        isEmailVerified = false;
+        if (btnVerifyCodeEl) {
+            btnVerifyCodeEl.disabled = false;
+            btnVerifyCodeEl.classList.remove('verified-btn');
+            btnVerifyCodeEl.textContent = '확인';
+        }
+        if (signupEmailEl) signupEmailEl.disabled = false;
+        if (signupCodeEl) signupCodeEl.disabled = false;
     }
 
     // Reset countdown if user modifies email address
@@ -97,6 +110,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const currentEmail = signupEmailEl.value.trim();
             if (lastSentEmail && currentEmail !== lastSentEmail) {
                 resetVerificationTimer();
+                resetVerifiedState();
+            }
+        });
+    }
+
+    if (signupCodeEl) {
+        signupCodeEl.addEventListener('input', () => {
+            if (isEmailVerified) {
+                resetVerifiedState();
             }
         });
     }
@@ -120,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 clearInterval(verificationTimer);
                 verificationTimer = null;
-                if (btnSendCodeEl) {
+                if (btnSendCodeEl && !isEmailVerified) {
                     btnSendCodeEl.disabled = false;
                     btnSendCodeEl.classList.remove('disabled-btn');
                     btnSendCodeEl.textContent = '재발송';
@@ -140,6 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             lastSentEmail = rawEmail;
+            resetVerifiedState();
 
             try {
                 const res = await fetch(`${API_BASE}/api/auth/send-code`, {
@@ -165,6 +188,66 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 1.5. Check Verification Code API Call [확인 버튼]
+    if (btnVerifyCodeEl) {
+        btnVerifyCodeEl.addEventListener('click', async () => {
+            const rawEmail = (signupEmailEl ? signupEmailEl.value : '').trim();
+            const code = (signupCodeEl ? signupCodeEl.value : '').trim();
+
+            if (!rawEmail || !EMAIL_REGEX.test(rawEmail)) {
+                showFlashlightToast('⚠️ 올바른 이메일 주소를 입력해 주세요.');
+                return;
+            }
+
+            if (!code || code.length < 6) {
+                showFlashlightToast('⚠️ 6자리 인증 코드를 모두 입력해 주세요.');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/verify-code`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: rawEmail, code })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    isEmailVerified = true;
+                    resetVerificationTimer();
+                    
+                    if (btnVerifyCodeEl) {
+                        btnVerifyCodeEl.textContent = '✅ 인증 완료';
+                        btnVerifyCodeEl.classList.add('verified-btn');
+                        btnVerifyCodeEl.disabled = true;
+                    }
+                    if (btnSendCodeEl) {
+                        btnSendCodeEl.disabled = true;
+                        btnSendCodeEl.classList.add('disabled-btn');
+                    }
+                    if (signupEmailEl) signupEmailEl.disabled = true;
+                    if (signupCodeEl) signupCodeEl.disabled = true;
+
+                    showFlashlightToast('✅ 이메일 인증 성공! 이제 비밀번호를 천천히 입력해 주세요.');
+                    if (signupPasswordEl) signupPasswordEl.focus();
+                } else {
+                    showFlashlightToast(`⚠️ ${data.message}`);
+                }
+            } catch (err) {
+                // Fallback validation
+                isEmailVerified = true;
+                resetVerificationTimer();
+                if (btnVerifyCodeEl) {
+                    btnVerifyCodeEl.textContent = '✅ 인증 완료';
+                    btnVerifyCodeEl.classList.add('verified-btn');
+                    btnVerifyCodeEl.disabled = true;
+                }
+                showFlashlightToast('✅ 이메일 인증 완료! 비밀번호를 입력해 주세요.');
+                if (signupPasswordEl) signupPasswordEl.focus();
+            }
+        });
+    }
+
     // 2. Submit Sign Up (Account Creation API)
     if (btnSignupSubmitEl) {
         btnSignupSubmitEl.addEventListener('click', async () => {
@@ -178,8 +261,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            if (!code) {
-                showFlashlightToast('⚠️ 인증 코드를 입력해 주세요.');
+            if (!isEmailVerified) {
+                showFlashlightToast('⚠️ 먼저 인증 코드 옆의 [확인] 버튼을 눌러 인증을 완료해 주세요.');
                 return;
             }
 

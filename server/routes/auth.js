@@ -43,6 +43,32 @@ router.post('/send-code', async (req, res) => {
     }
 });
 
+// 1.5. POST /api/auth/verify-code (Check Code Match & Pre-verify Email)
+router.post('/verify-code', (req, res) => {
+    try {
+        const { email, code } = req.body;
+        const normalizedEmail = (email || '').trim().toLowerCase();
+        const trimmedCode = (code || '').trim();
+
+        if (!normalizedEmail || !trimmedCode) {
+            return res.status(400).json({ success: false, message: '이메일과 인증 코드를 모두 입력해 주세요.' });
+        }
+
+        const storedCode = db.getVerificationCode(normalizedEmail);
+        if (!storedCode || storedCode !== trimmedCode) {
+            return res.status(400).json({ success: false, message: '인증 코드가 일치하지 않거나 만료되었습니다.' });
+        }
+
+        return res.json({
+            success: true,
+            message: '✅ 이메일 인증이 완료되었습니다!'
+        });
+    } catch (err) {
+        console.error('Verify code route error:', err);
+        return res.status(500).json({ success: false, message: '인증 코드 확인 중 오류가 발생했습니다.' });
+    }
+});
+
 // 2. POST /api/auth/signup (Account Creation & Verification)
 router.post('/signup', async (req, res) => {
     try {
